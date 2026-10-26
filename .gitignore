@@ -1,0 +1,14 @@
+﻿# 本地测试数据（原图是你的截图，不入库）
+testdata/
+*.rgba
+*.bin
+*.result.json
+*.compare.png
+*.recog.png
+*_orig.png
+
+# 系统/编辑器
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
