@@ -26,7 +26,7 @@
     img: null, iw: 0, ih: 0, data: null,
     gw: 50, gh: 50,
     gx: 0, gy: 0, cw: 10, ch: 10,
-    inkThr: 22, thick: 10, showGrid: true,
+    inkThr: 22, thick: 10, showGrid: true, showImage: true,
     samples: null, bg: [255, 255, 255],
     clusters: [], cells: null, clusOf: null,
     legend: null, legendTotal: 0,
@@ -230,7 +230,8 @@
       }
       return;
     }
-    drawProject(ctx, { sx: S.view.s, sy: S.view.s, tx: S.view.tx, ty: S.view.ty }, {});
+    drawProject(ctx, { sx: S.view.s, sy: S.view.s, tx: S.view.tx, ty: S.view.ty },
+      { imageAlpha: S.showImage ? 0.32 : 0 });
     if (S.boxFirst && S.mouse) {
       var ax = S.boxFirst.x, ay = S.boxFirst.y, bx = S.mouse.x, by = S.mouse.y;
       ctx.save();
@@ -462,6 +463,66 @@
       frag.appendChild(el);
     });
     box.appendChild(frag);
+  }
+
+  // ---------- 图片转像素画 ----------
+  function makePattern() {
+    if (!S.data) return toast('先载入一张图片/照片');
+    var gw = clamp(parseInt($('pgw').value, 10) || 50, 4, 200);
+    var gh = clamp(parseInt($('pgh').value, 10) || 50, 4, 200);
+    var fit = $('pCrop').checked ? 'crop' : 'stretch';
+    var opts = {
+      gw: gw, gh: gh, fit: fit,
+      maxColors: clamp(parseInt($('pColors').value, 10) || 0, 0, 221),
+      dither: $('pDither').value,
+      brightness: parseInt($('pBright').value, 10) || 0,
+      contrast: parseInt($('pContrast').value, 10) || 0,
+      saturation: parseInt($('pSat').value, 10) || 0,
+      removeBg: $('pRemoveBg').checked,
+      bgTol: 12
+    };
+    var t0 = performance.now();
+    var res = PC.buildPatternFromImage(S.data, S.iw, S.ih, opts);
+    if (!res) return toast('转换失败');
+    // 几何：网格正好铺满使用的源区域
+    var srcW = S.iw, srcH = S.ih, sx0 = 0, sy0 = 0;
+    if (fit === 'crop') {
+      var tr = gw / gh, sr = S.iw / S.ih;
+      if (sr > tr) { srcW = Math.round(S.ih * tr); sx0 = Math.round((S.iw - srcW) / 2); }
+      else { srcH = Math.round(S.iw / tr); sy0 = Math.round((S.ih - srcH) / 2); }
+    }
+    S.gw = gw; S.gh = gh;
+    S.gx = sx0; S.gy = sy0;
+    S.cw = srcW / gw; S.ch = srcH / gh;
+    S.samples = null;
+    S.legend = null; S.legendTotal = 0;
+    // 用生成结果造色簇（面板/改色/统计都能直接复用）
+    var byCodeMap = new Map();
+    res.cells.forEach(function (code, i) {
+      if (!code) return;
+      if (!byCodeMap.has(code)) byCodeMap.set(code, []);
+      byCodeMap.get(code).push(i);
+    });
+    S.clusters = res.paletteUsed.map(function (p, idx) {
+      return { id: idx, rgb: p.rgb.slice(), code: p.code, de: 0, cells: byCodeMap.get(p.code) || [], suggest: p.code };
+    }).filter(function (cl) { return cl.cells.length; });
+    S.clusters.forEach(function (cl, idx) { cl.id = idx; });
+    S.clusOf = new Int32Array(S.cells ? S.cells.length : res.cells.length).fill(-1);
+    S.cells = res.cells.slice();
+    S.clusOf = new Int32Array(S.cells.length).fill(-1);
+    S.clusters.forEach(function (cl) {
+      cl.cells.forEach(function (i) { S.clusOf[i] = cl.id; });
+    });
+    S.sel.clear(); S.undo = []; S.redo = [];
+    S.gridActive = true;
+    $('gw').value = S.gw; $('gh').value = S.gh;
+    $('patternInfo').textContent = res.paletteUsed.length + ' 色 / ' + res.total + ' 颗';
+    updateAll();
+    fitView();
+    pushUndo();
+    setStatus('已生成像素画：' + S.gw + '×' + S.gh + ' · ' + res.paletteUsed.length + ' 色 · ' +
+      res.total + ' 颗 · ' + Math.round(performance.now() - t0) + 'ms（可继续用色簇/选区/导出）');
+    toast('已生成像素画');
   }
 
   // ---------- 图例 ----------
@@ -743,6 +804,20 @@
     if (!S.gridActive) { toast('还没有网格：先「框选网格」或「自动对齐」'); return; }
     resample(true);
   });
+  $('makePattern').addEventListener('click', makePattern);
+  $('pShowImg').addEventListener('change', function (e) { S.showImage = e.target.checked; render(); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
+    b.addEventListener('click', function () {
+      var n = parseInt(b.getAttribute('data-preset'), 10);
+      $('pgw').value = n; $('pgh').value = n;
+    });
+  });
+  $('pgw').addEventListener('change', function (e) {
+    var v = clamp(parseInt(e.target.value, 10) || 50, 4, 200);
+    e.target.value = v;
+    if ($('pLock').checked && S.iw) $('pgh').value = clamp(Math.round(v * S.ih / S.iw), 4, 200);
+  });
+
   $('applyLegend').addEventListener('click', applyLegend);
   // 清理杂色：把小到不合理的零碎色块整块置空（水印/花边/压缩噪点），并把这些色从色簇列表里移除
   $('cleanNoise').addEventListener('click', function () {

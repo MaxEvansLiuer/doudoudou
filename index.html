@@ -22,6 +22,7 @@
   button.primary{background:#1d4b68;border-color:#2a6d94}
   button.danger{background:#552323;border-color:#8a3a3a}
   button.active{background:#1d4b68;border-color:#2a6d94}
+  select{font:inherit;background:#0f1116;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
   input[type=number],input[type=text],textarea{font:inherit;background:#0f1116;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 7px}
   input[type=number]{width:62px}
   label.chk{display:inline-flex;align-items:center;gap:4px;color:var(--muted);cursor:pointer}
@@ -148,6 +149,50 @@
         <h3>色簇 <span id="clusterInfo" class="muted tiny"></span>
           <button id="cleanNoise" class="tiny" style="float:right" title="把只有几颗的零碎色块当杂色清掉">清理杂色</button></h3>
         <div id="clusterList" class="list"><div class="muted tiny">载入图片后显示</div></div>
+      </section>
+
+      <section>
+        <h3>图片转像素画</h3>
+        <div class="row">
+          <span class="tiny muted">目标</span>
+          <input type="number" id="pgw" value="50" min="4" max="200" style="width:60px">
+          <span class="muted">×</span>
+          <input type="number" id="pgh" value="50" min="4" max="200" style="width:60px">
+          <button class="tiny" data-preset="50">50</button>
+          <button class="tiny" data-preset="100">100</button>
+          <label class="chk tiny"><input type="checkbox" id="pLock" checked> 锁比例</label>
+        </div>
+        <div class="row">
+          <span class="tiny muted">色数上限</span>
+          <input type="number" id="pColors" value="24" min="2" max="221" style="width:60px">
+          <span class="tiny muted">抖动</span>
+          <select id="pDither">
+            <option value="none">无</option>
+            <option value="ordered">有序</option>
+            <option value="fs">误差扩散</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="tiny muted" style="width:28px">亮度</span>
+          <input type="range" id="pBright" min="-50" max="50" value="0" style="flex:1">
+        </div>
+        <div class="row">
+          <span class="tiny muted" style="width:28px">对比</span>
+          <input type="range" id="pContrast" min="-50" max="50" value="0" style="flex:1">
+        </div>
+        <div class="row">
+          <span class="tiny muted" style="width:28px">饱和</span>
+          <input type="range" id="pSat" min="-50" max="50" value="0" style="flex:1">
+        </div>
+        <div class="row">
+          <label class="chk tiny"><input type="checkbox" id="pRemoveBg"> 去背景</label>
+          <label class="chk tiny"><input type="checkbox" id="pCrop" checked> 裁剪居中</label>
+          <label class="chk tiny"><input type="checkbox" id="pShowImg" checked> 显示原图</label>
+        </div>
+        <div class="row">
+          <button id="makePattern" class="primary">生成像素画</button>
+          <span id="patternInfo" class="muted tiny"></span>
+        </div>
       </section>
 
       <section>

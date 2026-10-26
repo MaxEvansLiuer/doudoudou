@@ -543,6 +543,174 @@
     return { cells: cells, dropped: dropped, deficits: deficits, rendered: rendered };
   }
 
+  // ==================== 图片 → 像素画（拼豆图纸） ====================
+  // 把普通照片缩成 gw×gh 格、每格取区域平均色，再把每格映射到 MARD 标准色（特殊材质不参与，
+  // 因为珠光/半透明/夜光在照片里无法可靠反推）。支持亮度/对比度/饱和度、有序抖动/误差扩散、去背景、限色。
+  var BAYER4 = [
+    0, 8, 2, 10,
+    12, 4, 14, 6,
+    3, 11, 1, 9,
+    15, 7, 13, 5
+  ];
+
+  function buildPatternFromImage(data, iw, ih, opts) {
+    opts = opts || {};
+    var gw = Math.round(opts.gw || 50), gh = Math.round(opts.gh || 50);
+    if (gw < 2 || gh < 2) return null;
+    var fit = opts.fit || 'crop';
+    var pal = PAL.filter(function (c) { return !c.special; });
+    if (!pal.length) return null;
+    var palLab = pal.map(function (c) { return { c: c, lab: rgb2lab(c.rgb) }; });
+
+    // 1) 取源区域（裁剪居中 or 拉伸）
+    var srcW = iw, srcH = ih, sx0 = 0, sy0 = 0;
+    if (fit === 'crop') {
+      var targetRatio = gw / gh, srcRatio = iw / ih;
+      if (srcRatio > targetRatio) { srcW = Math.round(ih * targetRatio); sx0 = Math.round((iw - srcW) / 2); }
+      else { srcH = Math.round(iw / targetRatio); sy0 = Math.round((ih - srcH) / 2); }
+    }
+
+    var bright = (opts.brightness || 0) / 100;
+    var contrast = (opts.contrast || 0) / 100;
+    var satK = (opts.saturation || 0) / 100;
+
+    // 2) 每格区域均值
+    var cellRgb = new Array(gw * gh);
+    var x, y, r, c, o, xa, xb, ya, yb, sr, sg, sb, n;
+    for (r = 0; r < gh; r++) {
+      for (c = 0; c < gw; c++) {
+        xa = Math.floor(sx0 + c * srcW / gw); xb = Math.ceil(sx0 + (c + 1) * srcW / gw) - 1;
+        ya = Math.floor(sy0 + r * srcH / gh); yb = Math.ceil(sy0 + (r + 1) * srcH / gh) - 1;
+        xa = xa < 0 ? 0 : xa; ya = ya < 0 ? 0 : ya;
+        xb = xb > iw - 1 ? iw - 1 : xb; yb = yb > ih - 1 ? ih - 1 : yb;
+        if (xb < xa) xb = xa;
+        if (yb < ya) yb = ya;
+        sr = 0; sg = 0; sb = 0; n = 0;
+        for (y = ya; y <= yb; y++) {
+          o = (y * iw + xa) * 4;
+          for (x = xa; x <= xb; x++, o += 4) { sr += data[o]; sg += data[o + 1]; sb += data[o + 2]; n++; }
+        }
+        if (!n) n = 1;
+        var rr = sr / n, gg = sg / n, bb = sb / n;
+        // 亮度 / 对比度 / 饱和度
+        if (bright) { rr += bright * 255; gg += bright * 255; bb += bright * 255; }
+        if (contrast) {
+          var k = 1 + contrast;
+          rr = (rr - 128) * k + 128; gg = (gg - 128) * k + 128; bb = (bb - 128) * k + 128;
+        }
+        if (satK) {
+          var gray = 0.299 * rr + 0.587 * gg + 0.114 * bb, ks = 1 + satK;
+          rr = gray + (rr - gray) * ks; gg = gray + (gg - gray) * ks; bb = gray + (bb - gray) * ks;
+        }
+        cellRgb[r * gw + c] = [
+          rr < 0 ? 0 : (rr > 255 ? 255 : rr),
+          gg < 0 ? 0 : (gg > 255 ? 255 : gg),
+          bb < 0 ? 0 : (bb > 255 ? 255 : bb)
+        ];
+      }
+    }
+
+    // 3) 去背景：用四个角判断底色，接近底色的格子置空
+    var empty = new Array(gw * gh).fill(false);
+    if (opts.removeBg) {
+      var corners = [cellRgb[0], cellRgb[gw - 1], cellRgb[(gh - 1) * gw], cellRgb[gh * gw - 1]];
+      var bg = [0, 0, 0], okAll = true;
+      for (var i = 0; i < 4; i++) { bg[0] += corners[i][0]; bg[1] += corners[i][1]; bg[2] += corners[i][2]; }
+      bg = [bg[0] / 4, bg[1] / 4, bg[2] / 4];
+      for (i = 0; i < 4; i++) if (deRgb(corners[i], bg) > 18) okAll = false;
+      if (okAll) {
+        var tol = opts.bgTol == null ? 12 : opts.bgTol;
+        for (i = 0; i < cellRgb.length; i++) if (deRgb(cellRgb[i], bg) < tol) empty[i] = true;
+      }
+    }
+
+    // 4) 映射到调色板（带抖动）
+    var cache = new Map();
+    function nearest(rgb) {
+      var key = ((rgb[0] >> 3) << 10) | ((rgb[1] >> 3) << 5) | (rgb[2] >> 3);
+      var hit = cache.get(key);
+      if (hit) return hit;
+      var lab = rgb2lab(rgb), bd = 1e9, bc = null;
+      for (var q = 0; q < palLab.length; q++) {
+        var d = ciede2000(lab, palLab[q].lab);
+        if (d < bd) { bd = d; bc = palLab[q].c; }
+      }
+      var res = { code: bc.code, rgb: bc.rgb, de: bd };
+      cache.set(key, res);
+      return res;
+    }
+
+    var codes = new Array(gw * gh).fill(null);
+    var dither = opts.dither || 'none';
+    var strength = opts.ditherStrength == null ? 20 : opts.ditherStrength;
+    var err = new Array(gw * gh).fill(null);
+    for (r = 0; r < gh; r++) {
+      for (c = 0; c < gw; c++) {
+        var idx = r * gw + c;
+        if (empty[idx]) continue;
+        var px = cellRgb[idx].slice();
+        if (dither === 'ordered') {
+          var b = (BAYER4[(r % 4) * 4 + (c % 4)] / 16 - 0.5) * strength;
+          px[0] += b; px[1] += b; px[2] += b;
+        } else if (dither === 'fs' && err[idx]) {
+          px[0] += err[idx][0]; px[1] += err[idx][1]; px[2] += err[idx][2];
+        }
+        for (var ch = 0; ch < 3; ch++) px[ch] = px[ch] < 0 ? 0 : (px[ch] > 255 ? 255 : px[ch]);
+        var m = nearest(px);
+        codes[idx] = m.code;
+        if (dither === 'fs') {
+          var dr = px[0] - m.rgb[0], dg = px[1] - m.rgb[1], db = px[2] - m.rgb[2];
+          var push = function (cc, rr2, w) {
+            if (cc < 0 || cc >= gw || rr2 < 0 || rr2 >= gh) return;
+            var j = rr2 * gw + cc;
+            if (empty[j]) return;
+            if (!err[j]) err[j] = [0, 0, 0];
+            err[j][0] += dr * w; err[j][1] += dg * w; err[j][2] += db * w;
+          };
+          push(c + 1, r, 7 / 16); push(c - 1, r + 1, 3 / 16);
+          push(c, r + 1, 5 / 16); push(c + 1, r + 1, 1 / 16);
+        }
+      }
+    }
+
+    // 5) 限制色数：把最少的颜色并到最接近的已有颜色上
+    var maxColors = opts.maxColors || 0;
+    if (maxColors > 0) {
+      var counts = new Map();
+      for (i = 0; i < codes.length; i++) if (codes[i]) counts.set(codes[i], (counts.get(codes[i]) || 0) + 1);
+      while (counts.size > maxColors) {
+        var list = Array.from(counts.entries()).sort(function (a, b) { return a[1] - b[1]; });
+        var victim = list[0][0];
+        var vLab = rgb2lab(byCode(victim).rgb), bd2 = 1e9, keeper = null;
+        counts.forEach(function (v, code) {
+          if (code === victim) return;
+          var d = ciede2000(vLab, rgb2lab(byCode(code).rgb));
+          if (d < bd2) { bd2 = d; keeper = code; }
+        });
+        if (!keeper) break;
+        for (i = 0; i < codes.length; i++) if (codes[i] === victim) codes[i] = keeper;
+        counts.set(keeper, counts.get(keeper) + counts.get(victim));
+        counts.delete(victim);
+      }
+    }
+
+    // 6) 汇总
+    var used = new Map();
+    for (i = 0; i < codes.length; i++) {
+      var cd = codes[i];
+      if (!cd) continue;
+      var e = used.get(cd);
+      if (!e) { e = { code: cd, count: 0 }; used.set(cd, e); }
+      e.count++;
+    }
+    var paletteUsed = Array.from(used.values()).map(function (e2) {
+      var p3 = byCode(e2.code);
+      return { code: e2.code, count: e2.count, rgb: p3 ? p3.rgb : [128, 128, 128], hex: p3 ? p3.hex : '#888888' };
+    }).sort(function (a, b) { return b.count - a.count; });
+
+    return { gw: gw, gh: gh, cells: codes, paletteUsed: paletteUsed, total: gw * gh - (codes.filter(function (v) { return !v; }).length) };
+  }
+
   // ==================== 按图例数量做"带容量约束的分配" ====================
   // 思路：图例给了每种颜色的准确颗数。把每个格子看成点，把色号看成带容量的中心，
   // 用"最近中心 + 容量约束"的贪心 + 迭代重估中心（带容量的 k-means），
@@ -867,6 +1035,7 @@
     cellStats: cellStats, sampleGrid: sampleGrid,
     estimateBgOutside: estimateBgOutside, isEmptyCell: isEmptyCell,
     buildClusters: buildClusters, assignDistinct: assignDistinct, matchByLegend: matchByLegend,
+    buildPatternFromImage: buildPatternFromImage,
     applyCodes: applyCodes, countCodes: countCodes, assignByLegendCounts: assignByLegendCounts, assignLegend: assignLegend,
     toGray: toGray, meanProfile: meanProfile, lineStrength: lineStrength, strongPeaks: strongPeaks,
     fitAxis: fitAxis, refineAxis: refineAxis, axisQuality: axisQuality, autoAlign: autoAlign, polishGeometry: polishGeometry, impurityScore: impurityScore, snapToLine: snapToLine
