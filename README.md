@@ -27,6 +27,9 @@
 - **中栏 · 画布**：撤销 / 重做、选择、缩放、适配窗口、显示网格、对比原图、全屏；左下角缩略图
 - **右栏 · 检查器**：图纸预览（拼豆图纸 / 原始图片 双 Tab）、图像信息、颜色面板、拼豆统计
 - **顶部命令条**：打开图片 / 自动识别 / 对齐网格 / 生成图纸 / 导出清单
+- **深色模式**：右上角月亮/太阳图标 → 跟随系统 / 浅色 / 深色，选择记在 localStorage
+
+> 图纸本身在深色下仍是白纸（和导出的 PNG 一致），只有界面外壳变深。
 
 导入时可选「**图纸截图**」或「**普通照片**」：选照片会自动隐藏网格校准相关参数、把主按钮换成「生成图纸」，
 避免出现对当前任务无效的控件。
@@ -102,7 +105,7 @@ mard-palette.js     MARD 295 色（window.MARD_PALETTE）
 data/               色卡原始数据
 docs/spec.md        需求规格（样例逆向分析、算法设计、验收标准）
 _smoketest.js       静态冒烟测试：node _smoketest.js（含「HTML id 契约」校验）
-_uismoke.js         UI 冒烟测试：用 jsdom 真跑 index.html，验证 34 条交互断言
+_uismoke.js         UI 冒烟测试：用 jsdom 真跑 index.html，验证 42 条交互断言
 _mkdemo.js          生成 testdata/demo.png（24×24 心形测试图纸）
 _realtest.js        真实截图评测：需要自备 testdata/（不入库）
 index.legacy.html   旧版深色界面（对照用，不参与运行）
@@ -113,7 +116,7 @@ DEPLOY.md           部署与"私有仓库能否公网访问"的说明
 
 ```bash
 node _smoketest.js    # 脚本能否初始化 + app.js 引用的每个 id 在 index.html 里都存在且唯一
-node _uismoke.js      # jsdom 真跑页面：模式切换 / Tab / 步进器 / 工具 / 弹层 / 空态（需 jsdom）
+node _uismoke.js      # jsdom 真跑页面：模式切换 / Tab / 步进器 / 工具 / 弹层 / 主题 / 空态（需 jsdom）
 node _realtest.js     # 真实截图评测，需 testdata/meta.json + 每张图的 .rgba
 ```
 

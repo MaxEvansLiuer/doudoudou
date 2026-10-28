@@ -139,6 +139,28 @@ function ok(name, cond, extra) {
   ok('图像信息未载入时显示 —', $('#infoSize').textContent === '—', $('#infoSize').textContent);
   ok('画布 chips 显示未载入', /未载入/.test($('#chipSize').textContent), $('#chipSize').textContent);
 
+  // 主题切换
+  ok('主题已初始化（html 上有 data-theme）', !!d.documentElement.getAttribute('data-theme'),
+    d.documentElement.getAttribute('data-theme'));
+  click($('#themeBtn'));
+  ok('点主题按钮弹出菜单', !$('#themeMenu').classList.contains('hidden'));
+  click($('[data-theme-set="dark"]'));
+  ok('切到深色 → data-theme=dark', d.documentElement.getAttribute('data-theme') === 'dark',
+    d.documentElement.getAttribute('data-theme'));
+  ok('选完自动关闭菜单', $('#themeMenu').classList.contains('hidden'));
+  ok('深色项被标记为选中', $('[data-theme-set="dark"]').classList.contains('on'));
+  click($('#themeBtn'));
+  click($('[data-theme-set="light"]'));
+  ok('切回浅色 → data-theme=light', d.documentElement.getAttribute('data-theme') === 'light',
+    d.documentElement.getAttribute('data-theme'));
+  click($('#themeBtn'));
+  click($('[data-theme-set="auto"]'));
+  ok('跟随系统 → data-theme-mode=auto', d.documentElement.getAttribute('data-theme-mode') === 'auto',
+    d.documentElement.getAttribute('data-theme-mode'));
+  click($('#themeBtn'));
+  click($('#themeBtn'));
+  ok('再点按钮可收起菜单', $('#themeMenu').classList.contains('hidden'));
+
   // 横向溢出
   await wait(100);
   const noOverflow = d.documentElement.scrollWidth <= d.documentElement.clientWidth + 1;

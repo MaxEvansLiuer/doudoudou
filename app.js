@@ -5,6 +5,37 @@
   var $ = function (id) { return document.getElementById(id); };
   var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
 
+  // ---------- 主题 ----------
+  // 画布是 canvas 画的，读不到 CSS 变量，所以从 :root 把配色抄进 TH，
+  // 主题一换就重新抄一遍。图纸纸张始终保持白色（导出的 PNG 就是白底）。
+  var TH = {
+    stage: '#EDEFF2', paper: '#FFFFFF',
+    grid: 'rgba(0,0,0,.22)', gridMajor: 'rgba(0,0,0,.6)', slash: 'rgba(0,0,0,.45)',
+    codeDark: 'rgba(0,0,0,.8)', codeLight: 'rgba(255,255,255,.92)',
+    ruler: 'rgba(0,0,0,.72)',
+    sel: '#F2A03D', selFill: 'rgba(242,160,61,.38)',
+    accent: '#2E7CF6', accent85: 'rgba(46,124,246,.85)', accent12: 'rgba(46,124,246,.12)',
+    accent08: 'rgba(46,124,246,.08)', accent90: 'rgba(46,124,246,.9)',
+    empty: '#B4B9C2'
+  };
+  var TH_MAP = {
+    '--cv-stage': 'stage', '--cv-paper': 'paper',
+    '--cv-grid': 'grid', '--cv-grid-major': 'gridMajor', '--cv-slash': 'slash',
+    '--cv-code-dark': 'codeDark', '--cv-code-light': 'codeLight', '--cv-ruler': 'ruler',
+    '--cv-sel': 'sel', '--cv-sel-fill': 'selFill',
+    '--cv-accent': 'accent', '--cv-accent-85': 'accent85', '--cv-accent-12': 'accent12',
+    '--cv-accent-08': 'accent08', '--cv-accent-90': 'accent90', '--cv-empty': 'empty'
+  };
+  function readTheme() {
+    if (!window.getComputedStyle) return;
+    var cs = getComputedStyle(document.documentElement);
+    Object.keys(TH_MAP).forEach(function (k) {
+      var v = (cs.getPropertyValue(k) || '').trim();
+      if (v) TH[TH_MAP[k]] = v;
+    });
+  }
+  readTheme();
+
   var PAL = window.MARD_PALETTE || [];
   PC.init(PAL);
   var BY = {};
@@ -33,7 +64,7 @@
     gridActive: false,              // 是否已对齐出网格（false = 只显示原图）
     sel: new Set(), mode: 'blob', conn8: false,
     hlCode: null, hlCluster: -1,
-    view: { s: 1, tx: 0, ty: 0 },
+    view: { s: 1, tx: 0, ty: 0 }, fitLock: true,
     tool: 'select', step: 1, spaceDown: false,
     boxDrag: null, boxAnchor: null, boxFirst: null, mouse: null, dragging: null,
     undo: [], redo: []
@@ -63,6 +94,7 @@
       S.samples = null; S.clusters = []; S.cells = null; S.clusOf = null;
       S.sel.clear();
       updateAll();
+      S.fitLock = true;
       fitView();
       setStatus('已载入 ' + S.iw + '×' + S.ih +
         '：填好宽高后点「自动对齐」；没把握就点「框选网格」（拖一下，或点两个对角）');
@@ -152,7 +184,7 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
     if (!S.img) {
-      ctx.fillStyle = '#B4B9C2';
+      ctx.fillStyle = TH.empty;
       ctx.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('未载入图片', w / 2, h / 2);
@@ -186,7 +218,7 @@
     var sw = $('cdSw'); if (!sw) return;
     if (code) { sw.style.background = hexOf(code); }
     else if (cl) { sw.style.background = 'rgb(' + cl.rgb.join(',') + ')'; }
-    else { sw.style.background = '#fff'; }
+    else { sw.style.background = ''; }
     $('cdCode').textContent = code || (cl ? '未指定' : '—');
     $('cdHex').textContent = code ? hexOf(code).toUpperCase() : '—';
     $('cdCount').textContent = code ? (n + ' 颗') : '—';
@@ -251,6 +283,7 @@
     S.gx = geo.gx; S.gy = geo.gy; S.cw = geo.cw; S.ch = geo.ch;
     resample(true);
     setTool('select');
+    S.fitLock = true;
     fitView();
     if (!silent) toast('自动对齐完成（' + Math.round(performance.now() - t0) + 'ms），不准就微调或框选');
   }
@@ -284,7 +317,7 @@
     }
     var ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#EDEFF2';
+    ctx.fillStyle = TH.stage;
     ctx.fillRect(0, 0, w, h);
     var zl = $('zoomReset');
     if (zl) {
@@ -301,8 +334,8 @@
       if (S.boxDrag) {
         var bd = S.boxDrag;
         ctx.save();
-        ctx.strokeStyle = '#2E7CF6';
-        ctx.fillStyle = 'rgba(46,124,246,.12)';
+        ctx.strokeStyle = TH.accent;
+        ctx.fillStyle = TH.accent12;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 4]);
         ctx.fillRect(Math.min(bd.x0, bd.x1), Math.min(bd.y0, bd.y1),
@@ -318,22 +351,22 @@
     if (S.boxFirst && S.mouse) {
       var ax = S.boxFirst.x, ay = S.boxFirst.y, bx = S.mouse.x, by = S.mouse.y;
       ctx.save();
-      ctx.strokeStyle = 'rgba(46,124,246,.9)';
-      ctx.fillStyle = 'rgba(46,124,246,.08)';
+      ctx.strokeStyle = TH.accent90;
+      ctx.fillStyle = TH.accent08;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       ctx.fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
       ctx.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
       ctx.setLineDash([]);
-      ctx.fillStyle = '#2E7CF6';
+      ctx.fillStyle = TH.accent;
       ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
     if (S.boxDrag) {
       var d = S.boxDrag;
       ctx.save();
-      ctx.strokeStyle = '#2E7CF6';
-      ctx.fillStyle = 'rgba(46,124,246,.12)';
+      ctx.strokeStyle = TH.accent;
+      ctx.fillStyle = TH.accent12;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       var x0 = Math.min(d.x0, d.x1), y0 = Math.min(d.y0, d.y1);
@@ -348,7 +381,7 @@
     var gw = S.gw, gh = S.gh, cw = S.cw, ch = S.ch, gx = S.gx, gy = S.gy;
     ctx.save();
     ctx.transform(sx, 0, 0, sy, view.tx, view.ty);
-    if (opt.fillBg) { ctx.fillStyle = '#fff'; ctx.fillRect(gx, gy, gw * cw, gh * ch); }
+    if (opt.fillBg) { ctx.fillStyle = TH.paper; ctx.fillRect(gx, gy, gw * cw, gh * ch); }
     if (S.img && !opt.noImage) {
       ctx.globalAlpha = opt.imageAlpha != null ? opt.imageAlpha : 0.32;
       ctx.drawImage(S.img, 0, 0);
@@ -376,7 +409,7 @@
           ctx.fillRect(x, y, cw + 0.3, ch + 0.3);
           if (cellPx >= 11 && pal && pal.special) {
             ctx.globalAlpha = alpha * 0.85;
-            ctx.strokeStyle = 'rgba(0,0,0,.45)';
+            ctx.strokeStyle = TH.slash;
             ctx.lineWidth = Math.max(0.6, cw * 0.06);
             ctx.beginPath();
             ctx.moveTo(x + cw * 0.25, y + ch * 0.75);
@@ -388,12 +421,12 @@
       }
     }
     if (S.showGrid || opt.clean) {
-      ctx.strokeStyle = 'rgba(0,0,0,.22)';
+      ctx.strokeStyle = TH.grid;
       ctx.lineWidth = Math.max(0.4, 0.7 / Math.max(sx, 1e-4));
       for (c = 0; c <= gw; c++) { x = gx + c * cw; ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, gy + gh * ch); ctx.stroke(); }
       for (r = 0; r <= gh; r++) { y = gy + r * ch; ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx + gw * cw, y); ctx.stroke(); }
       var tk = Math.max(2, S.thick | 0);
-      ctx.strokeStyle = 'rgba(0,0,0,.6)';
+      ctx.strokeStyle = TH.gridMajor;
       ctx.lineWidth = Math.max(1, 1.6 / Math.max(sx, 1e-4));
       for (c = 0; c <= gw; c += tk) { x = gx + c * cw; ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, gy + gh * ch); ctx.stroke(); }
       for (r = 0; r <= gh; r += tk) { y = gy + r * ch; ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx + gw * cw, y); ctx.stroke(); }
@@ -406,7 +439,7 @@
         for (c = 0; c < gw; c++) {
           i = r * gw + c; code = S.cells[i];
           if (!code) continue;
-          ctx.fillStyle = PC.lumOfHex(hexOf(code)) > 130 ? 'rgba(0,0,0,.8)' : 'rgba(255,255,255,.92)';
+          ctx.fillStyle = PC.lumOfHex(hexOf(code)) > 130 ? TH.codeDark : TH.codeLight;
           ctx.fillText(code, gx + c * cw + cw / 2, gy + r * ch + ch / 2);
         }
       }
@@ -414,7 +447,7 @@
     if (opt.ruler !== false && cellPx >= 5) {
       var fsz = Math.max(6 / sx, cw * 0.4);
       ctx.font = fsz.toFixed(2) + 'px ui-monospace,Consolas,monospace';
-      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillStyle = TH.ruler;
       var every = cellPx >= 26 ? 1 : (cellPx >= 12 ? 5 : 10);
       ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       for (c = 0; c < gw; c++) { if (c % every) continue; ctx.fillText(String(c + 1), gx + c * cw + cw / 2, gy - cw * 0.16); }
@@ -423,8 +456,8 @@
     }
     if (!opt.clean && S.sel.size) {
       ctx.save();
-      ctx.fillStyle = 'rgba(242,160,61,.38)';
-      ctx.strokeStyle = '#F2A03D';
+      ctx.fillStyle = TH.selFill;
+      ctx.strokeStyle = TH.sel;
       ctx.lineWidth = Math.max(1, 2 / Math.max(sx, 1e-4));
       S.sel.forEach(function (idx) {
         var rr = (idx / gw) | 0, cc = idx % gw;
@@ -435,7 +468,7 @@
       ctx.restore();
     }
     if (S.showBorder !== false || opt.clean) {
-      ctx.strokeStyle = 'rgba(46,124,246,.85)';
+      ctx.strokeStyle = TH.accent85;
       ctx.lineWidth = Math.max(1.2, 2 / Math.max(sx, 1e-4));
       ctx.strokeRect(gx, gy, gw * cw, gh * ch);
     }
@@ -595,6 +628,7 @@
     $('gw').value = S.gw; $('gh').value = S.gh;
     $('patternInfo').textContent = res.paletteUsed.length + ' 色 / ' + res.total + ' 颗';
     updateAll();
+    S.fitLock = true;
     fitView();
     pushUndo();
     setStatus('已生成像素画：' + S.gw + '×' + S.gh + ' · ' + res.paletteUsed.length + ' 色 · ' +
@@ -751,6 +785,7 @@
     if (!S.data) return;
     var p = canvasPos(e);
     if (S.spaceDown || e.button === 1 || e.button === 2 || S.tool === 'pan') {
+      S.fitLock = false;
       S.dragging = { type: 'pan', px: p.x, py: p.y };
       $('cv').style.cursor = 'grabbing';
       e.preventDefault();
@@ -856,6 +891,7 @@
     if (!S.data) return;
     e.preventDefault();
     var p = canvasPos(e);
+    S.fitLock = false;
     var k = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     var s1 = clamp(S.view.s * k, 0.02, 40), real = s1 / S.view.s;
     S.view.tx = p.x - (p.x - S.view.tx) * real;
@@ -898,7 +934,7 @@
   });
   $('autoAlign').addEventListener('click', function () { autoAlign(false); });
   $('resetGrid').addEventListener('click', function () { removeGrid(false); });
-  $('fitBtn').addEventListener('click', fitView);
+  $('fitBtn').addEventListener('click', function () { S.fitLock = true; fitView(); });
   // 边缘裁一格：裁掉图纸边缘的花纹/杂色带
   function trimEdge(dir) {
     if (!S.gridActive) return toast('还没有网格：先框选或自动对齐');
@@ -1023,6 +1059,7 @@
   $('zoomOut').addEventListener('click', function () { zoomBy(1 / 1.25); });
   $('zoomReset').addEventListener('click', function () { S.view.s = 1; render(); });
   function zoomBy(k) {
+    S.fitLock = false;
     var stage = $('stage');
     var cx = stage.clientWidth / 2, cy = stage.clientHeight / 2;
     var s1 = clamp(S.view.s * k, 0.02, 40), real = s1 / S.view.s;
@@ -1085,7 +1122,11 @@
   window.addEventListener('blur', function () {
     S.spaceDown = false; S.dragging = null; updateCursor();
   });
-  window.addEventListener('resize', function () { render(); });
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { if (S.fitLock) fitView(); else render(); }, 80);
+  });
 
   // ---------- 导出 ----------
   function download(blob, name) {
@@ -1269,7 +1310,7 @@
       $('gw').value = S.gw; $('gh').value = S.gh;
       S.gx = 0; S.gy = 0;
       S.cw = S.iw / S.gw; S.ch = S.ih / S.gh;
-      resample(true); fitView();
+      resample(true); S.fitLock = true; fitView();
       toast('已按' + (vertical ? '竖版' : '横版') + '交换宽高：' + S.gw + ' × ' + S.gh);
     }
     $('dirH').classList.toggle('on', !vertical);
@@ -1277,6 +1318,73 @@
   }
   $('dirH').addEventListener('click', function () { swapWH(false); });
   $('dirV').addEventListener('click', function () { swapWH(true); });
+
+  // ---------- 主题切换 ----------
+  var THEME_MODE = (function () {
+    var m = document.documentElement.getAttribute('data-theme-mode');
+    return (m === 'light' || m === 'dark' || m === 'auto') ? m : 'auto';
+  })();
+  function sysDark() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+  function syncThemeMenu() {
+    var box = $('themeMenu');
+    if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll('[data-theme-set]'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-theme-set') === THEME_MODE);
+    });
+    var btn = $('themeBtn');
+    if (btn) {
+      var label = THEME_MODE === 'auto' ? '跟随系统' : (THEME_MODE === 'dark' ? '深色' : '浅色');
+      btn.title = '主题：' + label;
+      btn.setAttribute('aria-expanded', box.classList.contains('hidden') ? 'false' : 'true');
+    }
+  }
+  function applyTheme(m, opts) {
+    opts = opts || {};
+    THEME_MODE = m;
+    var dark = m === 'dark' || (m === 'auto' && sysDark());
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme-mode', m);
+    if (!opts.keepStorage) { try { localStorage.setItem('pd-theme', m); } catch (e) {} }
+    readTheme();
+    syncThemeMenu();
+    render();
+    renderPreview();
+    if (!opts.silent) {
+      var label = m === 'auto' ? '跟随系统' : (m === 'dark' ? '深色' : '浅色');
+      toast('主题：' + label + (m === 'auto' ? '（当前' + (dark ? '深色' : '浅色') + '）' : ''));
+    }
+  }
+  $('themeBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var box = $('themeMenu');
+    box.classList.toggle('hidden');
+    syncThemeMenu();
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-theme-set]'), function (b) {
+    b.addEventListener('click', function () {
+      $('themeMenu').classList.add('hidden');
+      applyTheme(b.getAttribute('data-theme-set'));
+    });
+  });
+  document.addEventListener('click', function (e) {
+    var menu = $('themeMenu');
+    if (!menu || menu.classList.contains('hidden')) return;
+    var btn = $('themeBtn');
+    if (menu.contains(e.target) || (btn && (e.target === btn || btn.contains(e.target)))) return;
+    menu.classList.add('hidden');
+    syncThemeMenu();
+  });
+  if (window.matchMedia) {
+    var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSysTheme = function () {
+      if (THEME_MODE === 'auto') applyTheme('auto', { silent: true, keepStorage: true });
+    };
+    if (mqDark.addEventListener) mqDark.addEventListener('change', onSysTheme);
+    else if (mqDark.addListener) mqDark.addListener(onSysTheme);
+  }
+  syncThemeMenu();
 
   syncPvTabs();
   setGeoPane('auto');
