@@ -46,6 +46,7 @@ const sandbox = {
   performance: { now: () => 0 },
   URL: { createObjectURL: () => 'blob:', revokeObjectURL: noop },
   Blob: function () {},
+  Event: function (t, o) { this.type = t; this.bubbles = !!(o && o.bubbles); },
   Image: function () { this.onload = null; this.onerror = null; },
   FileReader: function () { this.readAsDataURL = noop; },
   devicePixelRatio: 1,
@@ -59,9 +60,12 @@ sandbox.document = {
   getElementById: (id) => makeEl(id),
   createElement: () => makeEl('created'),
   createDocumentFragment: () => makeEl('frag'),
-  querySelectorAll: () => [],
+  querySelectorAll: () => [makeEl('sel')],
   querySelector: () => makeEl('q'),
-  body: { appendChild: noop, removeChild: noop },
+  body: makeEl('body'),
+  documentElement: makeEl('html'),
+  fullscreenElement: null,
+  exitFullscreen: noop,
   addEventListener: noop
 };
 sandbox.addEventListener = noop;
@@ -95,6 +99,32 @@ if (sandbox.PindouCore) {
     if (typeof sandbox.PindouCore[k] !== 'function') { errors.push('core 缺函数 ' + k); console.error('  ✗ core 缺函数 ' + k); }
   }
   console.log('  ✓ core 导出函数齐全');
+}
+
+// ---- HTML 契约校验：app.js 引用的每个 id 都必须在 index.html 里存在且唯一 ----
+const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+const appSrc = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
+const htmlIds = new Map();
+for (const m of html.matchAll(/\sid="([^"]+)"/g)) {
+  htmlIds.set(m[1], (htmlIds.get(m[1]) || 0) + 1);
+}
+const usedIds = new Set();
+for (const m of appSrc.matchAll(/\$\('([A-Za-z0-9_]+)'\)/g)) usedIds.add(m[1]);
+for (const m of appSrc.matchAll(/getElementById\('([A-Za-z0-9_]+)'\)/g)) usedIds.add(m[1]);
+
+const missing = [...usedIds].filter((id) => !htmlIds.has(id));
+const dup = [...htmlIds.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+if (missing.length) {
+  errors.push('HTML 缺少 id: ' + missing.join(', '));
+  console.error('  ✗ index.html 缺少 ' + missing.length + ' 个 id → ' + missing.join(', '));
+} else {
+  console.log('  ✓ app.js 引用的 ' + usedIds.size + ' 个 id 在 index.html 里全部存在');
+}
+if (dup.length) {
+  errors.push('HTML 重复 id: ' + dup.join(', '));
+  console.error('  ✗ index.html 有重复 id → ' + dup.join(', '));
+} else {
+  console.log('  ✓ index.html 没有重复 id');
 }
 
 console.log(errors.length ? '\n✗ 冒烟测试失败：' + errors.length + ' 处' : '\n✔ 冒烟测试通过（界面脚本可正常初始化）');

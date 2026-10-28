@@ -1,5 +1,6 @@
 ﻿# 本地测试数据（原图是你的截图，不入库）
 testdata/
+shots/
 *.rgba
 *.bin
 *.result.json
@@ -12,3 +13,6 @@ Thumbs.db
 .DS_Store
 .idea/
 .vscode/
+
+# 本地 agent 工作记录（设计决策笔记，不入库）
+.workbuddy-ai/

@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>拼豆图纸识别 v0.2</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1b1e24; --panel2:#23272f; --line:#333a44;
+    --fg:#e9ebef; --muted:#98a1ad; --acc:#49c1ff; --warn:#ffd166; --danger:#ff6b6b; --ok:#6ee7a8;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:13px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--fg);overflow:hidden}
+  #app{height:100%;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .brand{font-weight:700;margin-right:6px;white-space:nowrap}
+  .brand small{color:var(--muted);font-weight:400}
+  .sp{flex:1}
+  button,.btn{font:inherit;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer;white-space:nowrap}
+  button:hover{border-color:var(--acc);background:#2a3038}
+  button.primary{background:#1d4b68;border-color:#2a6d94}
+  button.danger{background:#552323;border-color:#8a3a3a}
+  button.active{background:#1d4b68;border-color:#2a6d94}
+  select{font:inherit;background:#0f1116;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+  input[type=number],input[type=text],textarea{font:inherit;background:#0f1116;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 7px}
+  input[type=number]{width:62px}
+  label.chk{display:inline-flex;align-items:center;gap:4px;color:var(--muted);cursor:pointer}
+  main{flex:1;display:flex;min-height:0}
+  aside{width:332px;min-width:332px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+  section{background:#181b21;border:1px solid var(--line);border-radius:9px;padding:9px}
+  section h3{margin:0 0 8px;font-size:12px;color:var(--acc);font-weight:700;letter-spacing:.5px}
+  .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .row:last-child{margin-bottom:0}
+  .muted{color:var(--muted)} .tiny{font-size:11px}
+  .ok{color:var(--ok)} .bad{color:var(--danger)} .warn{color:var(--warn)}
+  #stage{flex:1;position:relative;min-width:0;background:#0c0d10}
+  #cv{display:block;width:100%;height:100%;cursor:default}
+  #hint{position:absolute;left:50%;top:16px;transform:translateX(-50%);background:#000c;border:1px solid var(--line);
+        padding:9px 16px;border-radius:8px;color:#cfd6df;pointer-events:none;max-width:80%;text-align:center;line-height:1.7}
+  #status{position:absolute;left:10px;bottom:10px;background:#000a;padding:5px 10px;border-radius:7px;font-size:12px;color:#cfd6df;pointer-events:none}
+  #zoomBox{position:absolute;right:10px;bottom:10px;display:flex;gap:6px}
+  #zoomBox button{padding:4px 10px}
+  .list{max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+  .rowItem{display:flex;align-items:center;gap:6px;padding:3px 5px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+  .rowItem:hover{background:#22262e}
+  .rowItem.hl{border-color:var(--warn);background:#2a2718}
+  .sw{width:20px;height:20px;border-radius:5px;border:1px solid #0008;flex:none}
+  .code{font-weight:700;font-family:ui-monospace,Consolas,monospace}
+  .tag{font-size:10px;padding:0 5px;border-radius:4px;background:#2c333d;color:#a9b7c6}
+  .tag.warn{background:#4a3a12;color:var(--warn)} .tag.bad{background:#4a1f1f;color:#ff9a9a}
+  .grow{flex:1}
+  .steps{counter-reset:s;display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+  .steps div::before{counter-increment:s;content:counter(s) "· ";color:var(--acc)}
+  .legendBox{width:100%;height:56px;resize:vertical}
+  .nudge{display:grid;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(2,30px);gap:5px}
+  .nudge button{padding:0;font-size:15px}
+  .toast{position:fixed;left:50%;top:12px;transform:translateX(-50%);background:#0b2b3d;border:1px solid #2b6f96;color:#d9eefb;padding:8px 16px;border-radius:8px;z-index:99;opacity:0;transition:.18s;pointer-events:none}
+  .toast.on{opacity:1}
+  .modal{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal.hidden{display:none}
+  .modalBox{width:min(780px,94vw);max-height:84vh;background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+  .modalHead{display:flex;gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--line)}
+  .modalHead input{flex:1}
+  .chips{display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .chip{padding:3px 10px;border-radius:14px;background:#22262e;border:1px solid var(--line);cursor:pointer;font-size:12px}
+  .chip.on{background:#1d4b68;border-color:#2a6d94}
+  .palGrid{padding:10px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
+  .palItem{border:1px solid var(--line);border-radius:7px;overflow:hidden;cursor:pointer;background:#14161b}
+  .palItem .cap{height:32px}
+  .palItem .lbl{padding:2px;font-size:11px;text-align:center;font-family:ui-monospace,Consolas,monospace}
+  .palItem:hover{border-color:var(--acc)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="brand">拼豆图纸识别 <small>v0.2</small></span>
+    <label class="btn">打开图片<input type="file" id="file" accept="image/*" hidden></label>
+    <button id="autoAlign" class="primary" title="用标题里的宽×高自动对齐网格">自动对齐</button>
+    <button id="boxTool" title="在图上拖一个框，框住整片网格">框选网格</button>
+    <button id="resetGrid" title="清掉识别结果，只显示原图">移除网格</button>
+    <span class="sp"></span>
+    <span class="muted">网格</span>
+    <input type="number" id="gw" min="1" max="200" value="50">
+    <span class="muted">×</span>
+    <input type="number" id="gh" min="1" max="200" value="50">
+    <button id="fitBtn">适配窗口</button>
+    <button id="exportPng">导出图纸</button>
+    <button id="exportCsv">导出清单</button>
+  </header>
+
+  <main>
+    <aside>
+      <section>
+        <h3>操作流程</h3>
+        <div class="steps">
+          <div>载入图片（拖进来，或 Ctrl+V 粘贴）</div>
+          <div>填标题里的 <b>宽×高</b>，点「自动对齐」；不准就点「框选网格」拖一下</div>
+          <div>把图例粘到下面「图例对账」→ 点「套用图例」，色号和数量自动对上</div>
+          <div>核对色簇 → 选区删改 → 导出</div>
+        </div>
+        <div class="tiny muted" style="margin-top:8px;line-height:1.7">
+          画布操作：<b>空格 + 拖动</b> 平移（像 PS）· 滚轮缩放 · 右键/中键拖动也能平移 · 方向键微调网格
+        </div>
+      </section>
+
+      <section>
+        <h3>网格微调 <span id="geoInfo" class="muted tiny"></span></h3>
+        <div class="row">
+          <span class="tiny muted">步长</span>
+          <button class="stepBtn" data-step="0.1">0.1</button>
+          <button class="stepBtn" data-step="0.5">0.5</button>
+          <button class="stepBtn active" data-step="1">1px</button>
+          <span class="grow"></span>
+          <label class="chk"><input type="checkbox" id="showGrid" checked> 显示网格</label>
+        </div>
+        <div class="row">
+          <div class="nudge">
+            <button data-nudge="-1,0">←</button>
+            <button data-nudge="0,-1">↑</button>
+            <button data-nudge="1,0">→</button>
+            <button data-nudge="0,1">↓</button>
+            <button data-nudge="-2,0">宽−</button>
+            <button data-nudge="2,0">宽+</button>
+          </div>
+          <div class="grow tiny muted">方向键也能微调</div>
+        </div>
+        <div class="row">
+          <span class="tiny muted">空白判定</span>
+          <input type="range" id="inkThr" min="10" max="56" step="2" value="22" style="flex:1">
+          <span id="inkThrVal" class="tiny">22</span>
+        </div>
+        <div class="row">
+          <span class="tiny muted">边缘裁格</span>
+          <button class="tiny" data-trim="top">裁上</button>
+          <button class="tiny" data-trim="bottom">裁下</button>
+          <button class="tiny" data-trim="left">裁左</button>
+          <button class="tiny" data-trim="right">裁右</button>
+        </div>
+        <div class="row">
+          <span class="tiny muted">粗线</span>
+          <input type="number" id="thick" value="10" min="2" max="30" style="width:56px">
+          <button id="applyGeo" class="tiny">重新识别</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>色簇 <span id="clusterInfo" class="muted tiny"></span>
+          <button id="cleanNoise" class="tiny" style="float:right" title="把只有几颗的零碎色块当杂色清掉">清理杂色</button></h3>
+        <div id="clusterList" class="list"><div class="muted tiny">载入图片后显示</div></div>
+      </section>
+
+      <section>
+        <h3>图片转像素画</h3>
+        <div class="row">
+          <span class="tiny muted">目标</span>
+          <input type="number" id="pgw" value="50" min="4" max="200" style="width:60px">
+          <span class="muted">×</span>
+          <input type="number" id="pgh" value="50" min="4" max="200" style="width:60px">
+          <button class="tiny" data-preset="50">50</button>
+          <button class="tiny" data-preset="100">100</button>
+          <label class="chk tiny"><input type="checkbox" id="pLock" checked> 锁比例</label>
+        </div>
+        <div class="row">
+          <span class="tiny muted">色数上限</span>
+          <input type="number" id="pColors" value="24" min="2" max="221" style="width:60px">
+          <span class="tiny muted">抖动</span>
+          <select id="pDither">
+            <option value="none">无</option>
+            <option value="ordered">有序</option>
+            <option value="fs">误差扩散</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="tiny muted" style="width:28px">亮度</span>
+          <input type="range" id="pBright" min="-50" max="50" value="0" style="flex:1">
+        </div>
+        <div class="row">
+          <span class="tiny muted" style="width:28px">对比</span>
+          <input type="range" id="pContrast" min="-50" max="50" value="0" style="flex:1">
+        </div>
+        <div class="row">
+          <span class="tiny muted" style="width:28px">饱和</span>
+          <input type="range" id="pSat" min="-50" max="50" value="0" style="flex:1">
+        </div>
+        <div class="row">
+          <label class="chk tiny"><input type="checkbox" id="pRemoveBg"> 去背景</label>
+          <label class="chk tiny"><input type="checkbox" id="pCrop" checked> 裁剪居中</label>
+          <label class="chk tiny"><input type="checkbox" id="pShowImg" checked> 显示原图</label>
+        </div>
+        <div class="row">
+          <button id="makePattern" class="primary">生成像素画</button>
+          <span id="patternInfo" class="muted tiny"></span>
+        </div>
+      </section>
+
+      <section>
+        <h3>图例对账</h3>
+        <textarea id="legendIn" class="legendBox" placeholder="把图里的图例粘进来，例如：&#10;A20 109&#10;A13 77&#10;（一行也行：A20 109 A13 77 ...）"></textarea>
+        <div class="row">
+          <button id="applyLegend" class="primary">套用图例</button>
+          <span id="legendInfo" class="muted tiny"></span>
+        </div>
+        <div id="legendDiff" class="list" style="max-height:150px"></div>
+      </section>
+
+      <section>
+        <h3>编辑 <span id="selInfo" class="muted tiny"></span></h3>
+        <div class="row">
+          <label class="chk"><input type="radio" name="selmode" value="blob" checked> 连通块</label>
+          <label class="chk"><input type="radio" name="selmode" value="color"> 同色全选</label>
+          <label class="chk tiny"><input type="checkbox" id="conn8"> 8连通</label>
+        </div>
+        <div class="row">
+          <button id="delBtn" class="danger">删除(置空)</button>
+          <button id="recolorBtn">改色</button>
+          <button id="undoBtn">撤销</button>
+          <button id="redoBtn">重做</button>
+          <button id="clearSel" class="tiny">清空选择</button>
+        </div>
+        <div class="tiny muted" style="line-height:1.7">
+          图上<b>连续点击</b>可多选（再点一次取消该块），点空白处清空；Shift+点击强制加选。<br>
+          选好后点「删除」或「改色」一次处理全部选中格。
+        </div>
+      </section>
+
+      <section>
+        <h3>统计 <span id="statInfo" class="muted tiny"></span></h3>
+        <div id="stats" class="list"></div>
+      </section>
+    </aside>
+
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <div id="hint">拖入图片，或按 Ctrl+V 粘贴截图</div>
+      <div id="status">等待载入图片</div>
+      <div id="zoomBox">
+        <button id="zoomOut">−</button>
+        <button id="zoomReset">100%</button>
+        <button id="zoomIn">+</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modalBox">
+    <div class="modalHead">
+      <strong>选择色号</strong>
+      <input type="text" id="palSearch" placeholder="搜索：R11 / 珠光 / A20">
+      <button id="palClose">关闭</button>
+    </div>
+    <div class="chips" id="palChips"></div>
+    <div class="palGrid" id="palGrid"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="mard-palette.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

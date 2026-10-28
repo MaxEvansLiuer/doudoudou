@@ -3,258 +3,795 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>拼豆图纸识别 v0.2</title>
+<title>拼豆图纸识别工具</title>
 <style>
   :root{
-    --bg:#14161a; --panel:#1b1e24; --panel2:#23272f; --line:#333a44;
-    --fg:#e9ebef; --muted:#98a1ad; --acc:#49c1ff; --warn:#ffd166; --danger:#ff6b6b; --ok:#6ee7a8;
+    --bg:#F4F5F7; --surface:#FFFFFF; --surface2:#F7F8FA;
+    --line:#E6E8EC; --line2:#D9DDE4;
+    --fg:#1D2129; --fg2:#4E5969; --fg3:#86909C;
+    --accent:#2E7CF6; --accentSoft:#EAF1FE; --accentLine:#C6DAFC;
+    --warn:#D97706; --danger:#E5484D; --ok:#12A150;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
-  body{font:13px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--fg);overflow:hidden}
-  #app{height:100%;display:flex;flex-direction:column}
-  header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .brand{font-weight:700;margin-right:6px;white-space:nowrap}
-  .brand small{color:var(--muted);font-weight:400}
-  .sp{flex:1}
-  button,.btn{font:inherit;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer;white-space:nowrap}
-  button:hover{border-color:var(--acc);background:#2a3038}
-  button.primary{background:#1d4b68;border-color:#2a6d94}
-  button.danger{background:#552323;border-color:#8a3a3a}
-  button.active{background:#1d4b68;border-color:#2a6d94}
-  select{font:inherit;background:#0f1116;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
-  input[type=number],input[type=text],textarea{font:inherit;background:#0f1116;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 7px}
-  input[type=number]{width:62px}
-  label.chk{display:inline-flex;align-items:center;gap:4px;color:var(--muted);cursor:pointer}
-  main{flex:1;display:flex;min-height:0}
-  aside{width:332px;min-width:332px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
-  section{background:#181b21;border:1px solid var(--line);border-radius:9px;padding:9px}
-  section h3{margin:0 0 8px;font-size:12px;color:var(--acc);font-weight:700;letter-spacing:.5px}
-  .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
-  .row:last-child{margin-bottom:0}
-  .muted{color:var(--muted)} .tiny{font-size:11px}
-  .ok{color:var(--ok)} .bad{color:var(--danger)} .warn{color:var(--warn)}
-  #stage{flex:1;position:relative;min-width:0;background:#0c0d10}
-  #cv{display:block;width:100%;height:100%;cursor:default}
-  #hint{position:absolute;left:50%;top:16px;transform:translateX(-50%);background:#000c;border:1px solid var(--line);
-        padding:9px 16px;border-radius:8px;color:#cfd6df;pointer-events:none;max-width:80%;text-align:center;line-height:1.7}
-  #status{position:absolute;left:10px;bottom:10px;background:#000a;padding:5px 10px;border-radius:7px;font-size:12px;color:#cfd6df;pointer-events:none}
-  #zoomBox{position:absolute;right:10px;bottom:10px;display:flex;gap:6px}
-  #zoomBox button{padding:4px 10px}
-  .list{max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:2px}
-  .rowItem{display:flex;align-items:center;gap:6px;padding:3px 5px;border-radius:6px;cursor:pointer;border:1px solid transparent}
-  .rowItem:hover{background:#22262e}
-  .rowItem.hl{border-color:var(--warn);background:#2a2718}
-  .sw{width:20px;height:20px;border-radius:5px;border:1px solid #0008;flex:none}
-  .code{font-weight:700;font-family:ui-monospace,Consolas,monospace}
-  .tag{font-size:10px;padding:0 5px;border-radius:4px;background:#2c333d;color:#a9b7c6}
-  .tag.warn{background:#4a3a12;color:var(--warn)} .tag.bad{background:#4a1f1f;color:#ff9a9a}
+  body{font:13px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--fg);overflow:hidden;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,p,dl,dd,dt{margin:0}
+  button{font:inherit}
+  .vh{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+  .app{height:100%;display:flex;flex-direction:column}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{height:56px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;
+          background:#fff;border-bottom:1px solid var(--line);position:relative;z-index:20}
+  .brand{display:flex;align-items:center;gap:9px;flex:none}
+  .logo{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
+  .brand h1{font-size:14px;font-weight:600;letter-spacing:.2px}
+  .brand p{font-size:11px;color:var(--fg3);margin-top:1px}
+  .cmdbar{display:flex;align-items:center;gap:7px;margin:0 auto}
+  .cmd{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border-radius:16px;
+       border:1px solid var(--line);background:#fff;color:var(--fg2);font-size:12px;cursor:pointer;
+       white-space:nowrap;transition:.14s}
+  .cmd svg{flex:none;opacity:.75}
+  .cmd:hover{border-color:var(--accentLine);color:var(--accent);background:var(--accentSoft)}
+  .cmd:hover svg{opacity:1}
+  .cmd.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .cmd.primary svg{opacity:.95}
+  .cmd.primary:hover{background:#2568D8;color:#fff}
+  .cmd.active{background:var(--accentSoft);border-color:var(--accentLine);color:var(--accent);font-weight:600}
+  .topRight{display:flex;align-items:center;gap:4px;flex:none}
+  .ghost{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 9px;border:none;border-radius:8px;
+         background:transparent;color:var(--fg3);font-size:12px;cursor:pointer}
+  .ghost:hover{background:var(--surface2);color:var(--fg2)}
+  .infoBtn{display:none;align-items:center;gap:5px;height:30px;padding:0 10px;border:1px solid var(--line);
+           border-radius:15px;background:#fff;color:var(--fg2);font-size:12px;cursor:pointer}
+
+  /* ---------- 三栏 ---------- */
+  .body{flex:1;display:grid;grid-template-columns:276px minmax(0,1fr) 304px;min-height:0}
+  .rail{padding:12px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;overflow-x:hidden;
+        background:var(--bg);scrollbar-width:thin}
+  .rail::-webkit-scrollbar{width:8px}
+  .rail::-webkit-scrollbar-thumb{background:#D5D9E0;border-radius:4px;border:2px solid var(--bg)}
+  .rail-left{border-right:1px solid var(--line)}
+  .rail-right{border-left:1px solid var(--line)}
+
+  /* ---------- 卡片 ---------- */
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+  .cardHead{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px}
+  .num{width:18px;height:18px;border-radius:50%;background:var(--accentSoft);color:var(--accent);
+       font-size:11px;font-weight:600;display:grid;place-items:center;flex:none;margin-top:1px}
+  .cardHead h2{font-size:13px;font-weight:600;line-height:1.35;display:flex;gap:5px}
+  .cardHead p{font-size:11px;color:var(--fg3);margin-top:1px;padding-right:2px}
+  .cardHead>div:not(.tail){min-width:0}
+  .cardHead .tail{margin-left:auto;flex:none;display:flex;align-items:center;gap:4px}
+  .linkBtn{height:22px;padding:0 7px;border:none;border-radius:6px;background:var(--accentSoft);
+           color:var(--accent);font-size:11px;cursor:pointer;white-space:nowrap}
+  .linkBtn:hover{background:#DCE8FD}
+  .mini{height:22px;padding:0 7px;border:1px solid var(--line);border-radius:6px;background:#fff;
+        color:var(--fg2);font-size:11px;cursor:pointer;white-space:nowrap}
+  .mini:hover{border-color:var(--accentLine);color:var(--accent)}
+  .mini.on{background:var(--accentSoft);border-color:var(--accentLine);color:var(--accent);font-weight:600}
+  .mini.active{background:var(--accentSoft);border-color:var(--accentLine);color:var(--accent);font-weight:600}
+  .muted{color:var(--fg3)}
+  .tiny{font-size:11px}
+
+  /* ---------- 表单 ---------- */
+  .field{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .field:last-child{margin-bottom:0}
+  .field>label,.field>.lb{font-size:12px;color:var(--fg2);flex:none;width:56px}
+  .stepper{display:flex;align-items:center;height:28px;border:1px solid var(--line);border-radius:8px;
+           overflow:hidden;margin-left:auto;background:#fff}
+  .stepper button{width:26px;height:100%;border:none;background:var(--surface2);color:var(--fg2);
+                  cursor:pointer;font-size:14px;line-height:1;padding:0}
+  .stepper button:hover{background:var(--accentSoft);color:var(--accent)}
+  .stepper input{width:48px;height:100%;border:none;outline:none;text-align:center;font-size:12px;
+                 background:#fff;color:var(--fg);font-family:inherit;-moz-appearance:textfield}
+  .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .stepper .unit{padding-right:8px;font-size:11px;color:var(--fg3)}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+                    background:#E4E7ED;flex:1;min-width:0;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+      background:#fff;border:2px solid var(--accent);cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.18)}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;
+      border:2px solid var(--accent);cursor:pointer}
+  .valOut{width:26px;text-align:right;font-size:11px;color:var(--fg2);font-variant-numeric:tabular-nums;flex:none}
+  select{font:inherit;font-size:12px;height:28px;padding:0 6px;border:1px solid var(--line);border-radius:8px;
+         background:#fff;color:var(--fg);margin-left:auto;cursor:pointer}
+  .segTabs{display:flex;gap:4px;background:var(--surface2);border-radius:9px;padding:3px;margin-bottom:9px}
+  .segTabs button{flex:1;height:26px;border:none;background:transparent;border-radius:7px;font-size:12px;
+                  color:var(--fg2);cursor:pointer}
+  .segTabs button.on{background:#fff;color:var(--accent);font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.08)}
+  .switch{position:relative;width:34px;height:20px;flex:none;margin-left:auto}
+  .switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:2;width:100%;height:100%}
+  .switch i{position:absolute;inset:0;background:#DCDFE6;border-radius:10px;transition:.15s}
+  .switch i::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;
+                   background:#fff;transition:.15s;box-shadow:0 1px 2px rgba(16,24,40,.2)}
+  .switch input:checked+i{background:var(--accent)}
+  .switch input:checked+i::after{transform:translateX(14px)}
+  .switchRow{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px;color:var(--fg2)}
+  .switchRow:last-child{margin-bottom:0}
+  .chk{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--fg2);cursor:pointer}
+  .chk input{accent-color:var(--accent);margin:0}
+  .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .row+.row{margin-top:7px}
+  .btnPrimary{height:32px;padding:0 12px;border-radius:8px;background:var(--accent);color:#fff;
+              border:1px solid var(--accent);font-size:12px;cursor:pointer}
+  .btnPrimary:hover{background:#2568D8}
+  .btnGhost{height:32px;padding:0 12px;border-radius:8px;background:#fff;color:var(--fg2);
+            border:1px solid var(--line);font-size:12px;cursor:pointer}
+  .btnGhost:hover{border-color:var(--accentLine);color:var(--accent)}
+  .big{width:100%;height:34px}
+  .btnPrimary.big,.btnGhost.big{font-size:12.5px}
+  .stack{display:flex;flex-direction:column;gap:7px}
+  .dashed{display:flex;align-items:center;justify-content:center;gap:6px;height:32px;border:1px dashed var(--line2);
+          border-radius:8px;color:var(--fg2);font-size:12px;cursor:pointer;background:#fff;transition:.14s}
+  .dashed:hover{border-color:var(--accent);color:var(--accent);background:var(--accentSoft)}
+  .hintLine{font-size:11px;color:var(--fg3);line-height:1.6;margin-top:7px}
+  .hintLine b{color:var(--fg2);font-weight:600}
+
+  /* ---------- 导入卡 ---------- */
+  .fileRow{display:flex;align-items:center;gap:9px;padding:7px;border:1px solid var(--line);border-radius:9px;
+           background:var(--surface2);margin-bottom:8px}
+  #thumb{width:44px;height:44px;border-radius:6px;background:#fff;border:1px solid var(--line);flex:none;object-fit:cover}
+  .fileMeta{min-width:0;flex:1}
+  .fileMeta b{display:block;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fileMeta span{font-size:11px;color:var(--fg3)}
+  .iconBtn{width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:var(--fg3);
+           cursor:pointer;font-size:14px;line-height:1;flex:none}
+  .iconBtn:hover{background:#ECEEF2;color:var(--danger)}
+
+  /* ---------- 工具网格 ---------- */
+  .toolGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+  .tool{height:32px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--fg2);
+        font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+  .tool:hover{border-color:var(--accentLine);color:var(--accent)}
+  .tool.on{background:var(--accentSoft);border-color:var(--accentLine);color:var(--accent);font-weight:600}
+  .nudge{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+  .nudge button{height:26px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--fg2);
+                font-size:12px;cursor:pointer;padding:0}
+  .nudge button:hover{border-color:var(--accentLine);color:var(--accent);background:var(--accentSoft)}
+  .trimRow{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;flex:1}
+  .trimRow .mini{padding:0}
+
+  /* ---------- 画布区 ---------- */
+  .workspace{display:flex;flex-direction:column;min-width:0;background:#fff}
+  .wstools{height:44px;flex:none;display:flex;align-items:center;gap:5px;padding:0 12px;border-bottom:1px solid var(--line)}
+  .tb{width:28px;height:28px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--fg2);
+      cursor:pointer;display:grid;place-items:center;padding:0}
+  .tb:hover{background:var(--surface2);color:var(--fg)}
+  .tb.on{background:var(--accentSoft);color:var(--accent);border-color:var(--accentLine)}
+  .tb:disabled{opacity:.35;cursor:default}
+  .zoomBox{display:flex;align-items:center;height:28px;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .zoomBox button{border:none;background:#fff;color:var(--fg2);height:100%;cursor:pointer;font-size:12px;padding:0 7px}
+  .zoomBox button:hover{background:var(--surface2);color:var(--accent)}
+  .zoomBox #zoomReset{min-width:48px;border-left:1px solid var(--line);border-right:1px solid var(--line);
+                      font-variant-numeric:tabular-nums;font-size:11px}
+  .vsep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
   .grow{flex:1}
-  .steps{counter-reset:s;display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
-  .steps div::before{counter-increment:s;content:counter(s) "· ";color:var(--acc)}
-  .legendBox{width:100%;height:56px;resize:vertical}
-  .nudge{display:grid;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(2,30px);gap:5px}
-  .nudge button{padding:0;font-size:15px}
-  .toast{position:fixed;left:50%;top:12px;transform:translateX(-50%);background:#0b2b3d;border:1px solid #2b6f96;color:#d9eefb;padding:8px 16px;border-radius:8px;z-index:99;opacity:0;transition:.18s;pointer-events:none}
-  .toast.on{opacity:1}
-  .modal{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:50}
+  .pill{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:13px;
+        border:1px solid var(--line);background:#fff;font-size:11.5px;color:var(--fg2);cursor:pointer}
+  .pill:hover{border-color:var(--accentLine);color:var(--accent)}
+  .pill.on{background:var(--accentSoft);border-color:var(--accentLine);color:var(--accent)}
+  .pill input{display:none}
+  .wschips{height:34px;flex:none;display:flex;align-items:center;gap:6px;padding:0 12px;
+           border-bottom:1px solid var(--line);background:#FCFCFD}
+  .chip2{height:22px;display:inline-flex;align-items:center;padding:0 9px;border-radius:11px;
+         background:var(--surface2);border:1px solid var(--line);font-size:11px;color:var(--fg2);
+         font-variant-numeric:tabular-nums}
+  #stage{position:relative;flex:1;min-height:0;background:#EDEFF2;overflow:hidden}
+  #cv{display:block;width:100%;height:100%;cursor:default}
+  #hint{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(255,255,255,.96);
+        border:1px solid var(--line);padding:9px 16px;border-radius:10px;color:var(--fg2);pointer-events:none;
+        max-width:78%;text-align:center;line-height:1.7;font-size:12px;box-shadow:0 4px 16px rgba(16,24,40,.08)}
+  #status{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(255,255,255,.95);
+          border:1px solid var(--line);padding:5px 12px;border-radius:14px;font-size:11px;color:var(--fg2);
+          pointer-events:none;max-width:64%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #thumbCard{position:absolute;left:12px;bottom:12px;display:flex;align-items:center;gap:7px;padding:6px;
+             background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 14px rgba(16,24,40,.07)}
+  #thumbCard .addBtn{width:26px;height:44px;border:1px dashed var(--line2);border-radius:7px;background:#fff;
+                     color:var(--fg3);font-size:15px;cursor:pointer;line-height:1;padding:0}
+  #thumbCard .addBtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accentSoft)}
+
+  /* ---------- 右栏 ---------- */
+  #pv{width:100%;height:148px;display:block;border-radius:9px;background:var(--surface2);
+      border:1px solid var(--line);margin-bottom:7px}
+  .pvMeta{font-size:11px;color:var(--fg3);text-align:center}
+  .kv{display:flex;flex-direction:column;gap:7px}
+  .kv>div{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;gap:8px}
+  .kv dt{color:var(--fg3);font-size:11.5px}
+  .kv dd{color:var(--fg);font-variant-numeric:tabular-nums;font-weight:500}
+  .swatchGrid{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin-bottom:9px}
+  .swatch{position:relative;aspect-ratio:1/1;border-radius:7px;border:1px solid rgba(0,0,0,.09);
+          cursor:pointer;padding:0;background:#fff;transition:transform .1s}
+  .swatch:hover{transform:scale(1.08)}
+  .swatch.on{box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--accent)}
+  .swatch.unspec{background:repeating-linear-gradient(45deg,#EEE 0 4px,#DDD 4px 8px)}
+  .colorDetail{display:flex;gap:9px;align-items:center;background:var(--surface2);border-radius:9px;padding:8px 9px}
+  .bigSw{width:38px;height:38px;border-radius:8px;border:1px solid rgba(0,0,0,.09);flex:none;background:#fff}
+  .cdInfo{flex:1;min-width:0}
+  .cdInfo div{display:flex;justify-content:space-between;font-size:11px;line-height:1.7}
+  .cdInfo span:first-child{color:var(--fg3)}
+  .cdInfo span:last-child{color:var(--fg);font-variant-numeric:tabular-nums}
+  .statList{display:flex;flex-direction:column;gap:1px;max-height:262px;overflow:auto;margin:-2px -4px 0;padding:0 4px}
+  .statRow{position:relative;display:grid;grid-template-columns:14px 13px minmax(0,1fr) auto 44px;
+           gap:7px;align-items:center;padding:5px 5px;border-radius:7px;cursor:pointer;font-size:12px}
+  .statRow:hover{background:var(--surface2)}
+  .statRow.on{background:var(--accentSoft)}
+  .statRow .idx{color:var(--fg3);font-size:10.5px;text-align:right;font-variant-numeric:tabular-nums}
+  .statRow .sw{width:13px;height:13px;border-radius:4px;border:1px solid rgba(0,0,0,.1)}
+  .statRow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg2)}
+  .statRow .n{font-variant-numeric:tabular-nums;color:var(--fg);font-weight:500}
+  .statRow .pct{text-align:right;color:var(--fg3);font-size:11px;font-variant-numeric:tabular-nums}
+  .statRow .bar{position:absolute;left:5px;bottom:2px;height:2px;border-radius:1px;background:var(--accentLine)}
+  .emptyLine{font-size:11px;color:var(--fg3);padding:8px 0}
+  .swatchGrid .emptyLine{grid-column:1/-1;padding:4px 0}
+  .statList .emptyLine{padding:6px 0}
+
+  /* ---------- 弹层 ---------- */
+  .modal{position:fixed;inset:0;background:rgba(16,24,40,.42);display:flex;align-items:center;
+         justify-content:center;z-index:60;padding:24px}
   .modal.hidden{display:none}
-  .modalBox{width:min(780px,94vw);max-height:84vh;background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
-  .modalHead{display:flex;gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--line)}
-  .modalHead input{flex:1}
-  .chips{display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
-  .chip{padding:3px 10px;border-radius:14px;background:#22262e;border:1px solid var(--line);cursor:pointer;font-size:12px}
-  .chip.on{background:#1d4b68;border-color:#2a6d94}
-  .palGrid{padding:10px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
-  .palItem{border:1px solid var(--line);border-radius:7px;overflow:hidden;cursor:pointer;background:#14161b}
-  .palItem .cap{height:32px}
-  .palItem .lbl{padding:2px;font-size:11px;text-align:center;font-family:ui-monospace,Consolas,monospace}
-  .palItem:hover{border-color:var(--acc)}
+  .modalBox{width:min(760px,94vw);max-height:84vh;background:#fff;border-radius:14px;display:flex;
+            flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(16,24,40,.2);min-height:0}
+  .modalHead{display:flex;gap:8px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line);flex:none}
+  .modalHead strong{font-size:13px}
+  .modalHead input[type=text]{flex:1;height:30px;border:1px solid var(--line);border-radius:8px;
+      padding:0 10px;font:inherit;font-size:12px;outline:none;color:var(--fg)}
+  .modalHead input[type=text]:focus{border-color:var(--accentLine);box-shadow:0 0 0 3px var(--accentSoft)}
+  .chips{display:flex;gap:6px;padding:10px 16px;flex-wrap:wrap;border-bottom:1px solid var(--line);flex:none}
+  .chip{padding:3px 11px;border-radius:13px;background:var(--surface2);border:1px solid var(--line);
+        cursor:pointer;font-size:11.5px;color:var(--fg2)}
+  .chip.on{background:var(--accentSoft);border-color:var(--accentLine);color:var(--accent);font-weight:600}
+  .palGrid{padding:12px 16px 16px;overflow:auto;display:grid;flex:1;min-height:0;align-content:start;
+           grid-template-columns:repeat(auto-fill,minmax(74px,1fr));grid-auto-rows:52px;gap:7px}
+  .palItem{border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;background:#fff;
+           display:flex;flex-direction:column;height:52px}
+  .palItem .cap{flex:1;min-height:0}
+  .palItem .lbl{flex:none;height:18px;line-height:18px;padding:0;font-size:11px;text-align:center;
+                font-family:ui-monospace,Consolas,monospace;color:var(--fg2)}
+  .palItem:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(46,124,246,.16)}
+  .modalBody{padding:14px 16px;display:flex;flex-direction:column;gap:9px;overflow:auto;flex:1;min-height:0}
+  .legendBox{width:100%;min-height:168px;resize:vertical;border:1px solid var(--line);border-radius:9px;
+             padding:9px 10px;font:12px/1.6 ui-monospace,Consolas,monospace;color:var(--fg);outline:none}
+  .legendBox:focus{border-color:var(--accentLine);box-shadow:0 0 0 3px var(--accentSoft)}
+  .legendList{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto}
+
+  /* 列表行（图例差额 / 通用） */
+  .list{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto}
+  .rowItem{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:7px;
+           cursor:pointer;border:1px solid transparent;font-size:12px}
+  .rowItem:hover{background:var(--surface2)}
+  .rowItem.hl{border-color:var(--accentLine);background:var(--accentSoft)}
+  .sw{width:15px;height:15px;border-radius:4px;border:1px solid rgba(0,0,0,.1);flex:none}
+  .code{font-weight:600;font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+  .tag{font-size:10px;padding:0 5px;border-radius:4px;background:#EEF0F3;color:var(--fg2)}
+  .tag.warn{background:#FEF3E2;color:var(--warn)} .tag.bad{background:#FDECEC;color:var(--danger)}
+  .ok{color:var(--ok)} .bad{color:var(--danger)} .warn{color:var(--warn)}
+
+  .toast{position:fixed;left:50%;bottom:56px;transform:translateX(-50%) translateY(6px);background:#fff;
+         border:1px solid var(--line);color:var(--fg);padding:8px 16px;border-radius:10px;z-index:99;
+         opacity:0;transition:.18s;pointer-events:none;font-size:12px;box-shadow:0 8px 24px rgba(16,24,40,.14)}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* 模式切换：图纸截图 / 普通照片 */
+  body[data-mode="scan"] .only-photo{display:none!important}
+  body[data-mode="photo"] .only-scan{display:none!important}
+
+  @media (max-width:1439px){
+    .body{grid-template-columns:252px minmax(0,1fr)}
+    .rail-right{position:fixed;right:0;top:56px;bottom:0;width:300px;z-index:45;
+                transform:translateX(100%);transition:transform .2s;box-shadow:-10px 0 30px rgba(16,24,40,.1)}
+    .railToggle:checked~.body .rail-right{transform:none}
+    .infoBtn{display:inline-flex}
+  }
+  @media (max-width:1199px){
+    .body{grid-template-columns:212px minmax(0,1fr)}
+    .rail{padding:10px 8px}
+    .cmd span{display:none}
+    .cmd{padding:0 10px}
+  }
 </style>
 </head>
-<body>
-<div id="app">
-  <header>
-    <span class="brand">拼豆图纸识别 <small>v0.2</small></span>
-    <label class="btn">打开图片<input type="file" id="file" accept="image/*" hidden></label>
-    <button id="autoAlign" class="primary" title="用标题里的宽×高自动对齐网格">自动对齐</button>
-    <button id="boxTool" title="在图上拖一个框，框住整片网格">框选网格</button>
-    <button id="resetGrid" title="清掉识别结果，只显示原图">移除网格</button>
-    <span class="sp"></span>
-    <span class="muted">网格</span>
-    <input type="number" id="gw" min="1" max="200" value="50">
-    <span class="muted">×</span>
-    <input type="number" id="gh" min="1" max="200" value="50">
-    <button id="fitBtn">适配窗口</button>
-    <button id="exportPng">导出图纸</button>
-    <button id="exportCsv">导出清单</button>
+<body data-mode="scan">
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".95"/>
+          <rect x="6.7" y="1" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".7"/>
+          <rect x="12.4" y="1" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".45"/>
+          <rect x="1" y="6.7" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".7"/>
+          <rect x="6.7" y="6.7" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".95"/>
+          <rect x="12.4" y="6.7" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".6"/>
+          <rect x="1" y="12.4" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".45"/>
+          <rect x="6.7" y="12.4" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".6"/>
+          <rect x="12.4" y="12.4" width="4.6" height="4.6" rx="1.4" fill="#fff" opacity=".35"/>
+        </svg>
+      </div>
+      <div>
+        <h1>拼豆图纸识别工具</h1>
+        <p>将图片转换为拼豆图纸，简单高效</p>
+      </div>
+    </div>
+
+    <nav class="cmdbar">
+      <label class="cmd" for="file" title="打开本地图片，或直接拖入 / Ctrl+V 粘贴">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M1.5 4.2a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.6h5.3a1.2 1.2 0 0 1 1.2 1.2v6.6a1.2 1.2 0 0 1-1.2 1.2H2.7a1.2 1.2 0 0 1-1.2-1.2V4.2Z" stroke-linejoin="round"/>
+        </svg>
+        <span>打开图片</span>
+      </label>
+      <button id="autoAlign" class="cmd primary" title="用宽×高自动对齐网格">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M8 1.6l1.5 3.4 3.4 1.5-3.4 1.5L8 11.4 6.5 8 3.1 6.5 6.5 5 8 1.6Z" stroke-linejoin="round"/>
+          <path d="M12.6 11.2l.7 1.5 1.5.7-1.5.7-.7 1.5-.7-1.5-1.5-.7 1.5-.7.7-1.5Z" stroke-linejoin="round"/>
+        </svg>
+        <span>自动识别</span>
+      </button>
+      <button id="boxTool" class="cmd" title="在图上拖一个框，框住整片网格">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="2" y="2" width="12" height="12" rx="1.6"/>
+          <path d="M6 2v12M10 2v12M2 6h12M2 10h12"/>
+        </svg>
+        <span>对齐网格</span>
+      </button>
+      <button id="exportPngTop" class="cmd" title="导出带色号与标尺的图纸 PNG">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="2" y="2" width="12" height="12" rx="1.6"/>
+          <path d="M2 10.4l3-2.8 2.6 2.4 2-1.8L14 11" stroke-linejoin="round"/>
+          <circle cx="5.6" cy="5.6" r="1"/>
+        </svg>
+        <span class="only-scan">导出图纸</span><span class="only-photo">生成图纸</span>
+      </button>
+      <button id="exportCsvTop" class="cmd" title="导出用量清单 CSV">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M3 2.5h7l3 3v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1Z" stroke-linejoin="round"/>
+          <path d="M5 8.5h6M5 11h4"/>
+        </svg>
+        <span>导出清单</span>
+      </button>
+    </nav>
+
+    <div class="topRight">
+      <label class="infoBtn" for="railToggle">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <circle cx="8" cy="8" r="6.2"/><path d="M8 7.2v4M8 4.9v.1"/>
+        </svg>
+        信息
+      </label>
+      <button class="ghost" title="使用说明">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <circle cx="8" cy="8" r="6.2"/><path d="M6.3 6.2a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.5-.7 1v.3M8 11.4v.1"/>
+        </svg>
+        帮助
+      </button>
+      <button class="ghost" title="设置">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <circle cx="8" cy="8" r="2.1"/>
+          <path d="M8 1.6l.9 1.7 1.9-.4.5 1.9 1.7.9-1 1.6.9 1.6-1.7.9-.5 1.9-1.9-.4L8 14.4l-.9-1.7-1.9.4-.5-1.9-1.7-.9 1-1.6-1-1.6 1.7-.9.5-1.9 1.9.4L8 1.6Z" stroke-linejoin="round"/>
+        </svg>
+        设置
+      </button>
+    </div>
   </header>
 
-  <main>
-    <aside>
-      <section>
-        <h3>操作流程</h3>
-        <div class="steps">
-          <div>载入图片（拖进来，或 Ctrl+V 粘贴）</div>
-          <div>填标题里的 <b>宽×高</b>，点「自动对齐」；不准就点「框选网格」拖一下</div>
-          <div>把图例粘到下面「图例对账」→ 点「套用图例」，色号和数量自动对上</div>
-          <div>核对色簇 → 选区删改 → 导出</div>
-        </div>
-        <div class="tiny muted" style="margin-top:8px;line-height:1.7">
-          画布操作：<b>空格 + 拖动</b> 平移（像 PS）· 滚轮缩放 · 右键/中键拖动也能平移 · 方向键微调网格
-        </div>
-      </section>
+  <input type="checkbox" id="railToggle" class="railToggle vh">
+  <input type="file" id="file" accept="image/*" hidden>
 
-      <section>
-        <h3>网格微调 <span id="geoInfo" class="muted tiny"></span></h3>
-        <div class="row">
-          <span class="tiny muted">步长</span>
-          <button class="stepBtn" data-step="0.1">0.1</button>
-          <button class="stepBtn" data-step="0.5">0.5</button>
-          <button class="stepBtn active" data-step="1">1px</button>
-          <span class="grow"></span>
-          <label class="chk"><input type="checkbox" id="showGrid" checked> 显示网格</label>
+  <main class="body">
+
+    <!-- ============ 左栏：6 步 ============ -->
+    <aside class="rail rail-left">
+
+      <!-- 1 导入 -->
+      <section class="card">
+        <div class="cardHead">
+          <span class="num">1</span>
+          <div><h2>导入图片</h2><p>拖拽或粘贴即可开始</p></div>
         </div>
-        <div class="row">
-          <div class="nudge">
-            <button data-nudge="-1,0">←</button>
-            <button data-nudge="0,-1">↑</button>
-            <button data-nudge="1,0">→</button>
-            <button data-nudge="0,1">↓</button>
-            <button data-nudge="-2,0">宽−</button>
-            <button data-nudge="2,0">宽+</button>
+        <div class="fileRow">
+          <canvas id="thumb" width="88" height="88"></canvas>
+          <div class="fileMeta">
+            <b id="fileName">未选择图片</b>
+            <span id="fileSize">拖入图片或 Ctrl+V</span>
           </div>
-          <div class="grow tiny muted">方向键也能微调</div>
+          <button id="fileClear" class="iconBtn" title="移除图片">×</button>
         </div>
-        <div class="row">
-          <span class="tiny muted">空白判定</span>
-          <input type="range" id="inkThr" min="10" max="56" step="2" value="22" style="flex:1">
-          <span id="inkThrVal" class="tiny">22</span>
+        <div class="segTabs" style="margin-bottom:8px">
+          <button id="modeScan" class="on">图纸截图</button>
+          <button id="modePhoto">普通照片</button>
         </div>
-        <div class="row">
-          <span class="tiny muted">边缘裁格</span>
-          <button class="tiny" data-trim="top">裁上</button>
-          <button class="tiny" data-trim="bottom">裁下</button>
-          <button class="tiny" data-trim="left">裁左</button>
-          <button class="tiny" data-trim="right">裁右</button>
+        <label class="dashed" for="file">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M8 3.2v9.6M3.2 8h9.6"/>
+          </svg>
+          重新选择图片
+        </label>
+      </section>
+
+      <!-- 2 预处理 -->
+      <section class="card">
+        <div class="cardHead">
+          <span class="num">2</span>
+          <div><h2>图像预处理</h2><p>调整效果与对比</p></div>
+          <div class="tail"><button id="resetTune" class="linkBtn">重置</button></div>
         </div>
-        <div class="row">
-          <span class="tiny muted">粗线</span>
-          <input type="number" id="thick" value="10" min="2" max="30" style="width:56px">
-          <button id="applyGeo" class="tiny">重新识别</button>
+        <div class="only-scan">
+          <div class="field">
+            <span class="lb">空白判定</span>
+            <input type="range" id="inkThr" min="10" max="56" step="2" value="22">
+            <b id="inkThrVal" class="valOut">22</b>
+          </div>
+          <p class="hintLine">浅色豆被当成空白时，把滑块往左拉。</p>
+        </div>
+        <div class="only-photo">
+          <div class="field"><span class="lb">亮度</span>
+            <input type="range" id="pBright" min="-50" max="50" value="0" data-out="1"><b class="valOut" data-for="pBright">0</b></div>
+          <div class="field"><span class="lb">对比度</span>
+            <input type="range" id="pContrast" min="-50" max="50" value="0" data-out="1"><b class="valOut" data-for="pContrast">0</b></div>
+          <div class="field"><span class="lb">饱和度</span>
+            <input type="range" id="pSat" min="-50" max="50" value="0" data-out="1"><b class="valOut" data-for="pSat">0</b></div>
         </div>
       </section>
 
-      <section>
-        <h3>色簇 <span id="clusterInfo" class="muted tiny"></span>
-          <button id="cleanNoise" class="tiny" style="float:right" title="把只有几颗的零碎色块当杂色清掉">清理杂色</button></h3>
-        <div id="clusterList" class="list"><div class="muted tiny">载入图片后显示</div></div>
+      <!-- 3 网格 / 目标尺寸 -->
+      <section class="card">
+        <div class="cardHead">
+          <span class="num">3</span>
+          <div>
+            <h2><span class="only-scan">网格校准</span><span class="only-photo">目标尺寸</span></h2>
+            <p><span class="only-scan">设置格子参数并对齐</span><span class="only-photo">设置成品拼豆的格数</span></p>
+          </div>
+        </div>
+
+        <div class="only-scan">
+          <div class="segTabs">
+            <button id="tabAuto" class="on">自动识别</button>
+            <button id="tabManual">手动调整</button>
+          </div>
+          <div id="paneAuto">
+            <div class="field">
+              <span class="lb">网格宽</span>
+              <div class="stepper">
+                <button data-step-in="gw" data-dir="-1">−</button>
+                <input type="number" id="gw" min="1" max="200" value="50">
+                <button data-step-in="gw" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="field">
+              <span class="lb">网格高</span>
+              <div class="stepper">
+                <button data-step-in="gh" data-dir="-1">−</button>
+                <input type="number" id="gh" min="1" max="200" value="50">
+                <button data-step-in="gh" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="field">
+              <span class="lb">线宽</span>
+              <div class="stepper">
+                <button data-step-in="thick" data-dir="-1">−</button>
+                <input type="number" id="thick" min="2" max="30" value="10">
+                <button data-step-in="thick" data-dir="1">+</button>
+                <span class="unit">px</span>
+              </div>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button id="autoAlignIn" class="btnPrimary" style="flex:1">自动识别</button>
+              <button id="applyGeo" class="btnGhost">重新识别</button>
+            </div>
+            <p class="hintLine" id="geoInfo"></p>
+          </div>
+          <div id="paneManual" style="display:none">
+            <div class="field">
+              <span class="lb">步长</span>
+              <div class="row" style="margin-left:auto">
+                <button class="mini stepBtn" data-step="0.1">0.1</button>
+                <button class="mini stepBtn" data-step="0.5">0.5</button>
+                <button class="mini stepBtn active" data-step="1">1px</button>
+              </div>
+            </div>
+            <div class="nudge" style="margin-bottom:8px">
+              <button data-nudge="-1,0">←</button>
+              <button data-nudge="0,-1">↑</button>
+              <button data-nudge="1,0">→</button>
+              <button data-nudge="0,1">↓</button>
+            </div>
+            <div class="field">
+              <span class="lb">方向</span>
+              <div class="segTabs" style="margin:0 0 0 auto;width:132px">
+                <button id="dirH" class="on">横版</button>
+                <button id="dirV">竖版</button>
+              </div>
+            </div>
+            <div class="field" style="margin-top:8px;align-items:center">
+              <span class="lb">边缘裁格</span>
+              <div class="trimRow">
+                <button class="mini" data-trim="top">裁上</button>
+                <button class="mini" data-trim="bottom">裁下</button>
+                <button class="mini" data-trim="left">裁左</button>
+                <button class="mini" data-trim="right">裁右</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="only-photo">
+          <div class="field">
+            <span class="lb">目标宽</span>
+            <div class="stepper">
+              <button data-step-in="pgw" data-dir="-1">−</button>
+              <input type="number" id="pgw" min="4" max="200" value="50">
+              <button data-step-in="pgw" data-dir="1">+</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="lb">目标高</span>
+            <div class="stepper">
+              <button data-step-in="pgh" data-dir="-1">−</button>
+              <input type="number" id="pgh" min="4" max="200" value="50">
+              <button data-step-in="pgh" data-dir="1">+</button>
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="mini" data-preset="50">50×50</button>
+            <button class="mini" data-preset="100">100×100</button>
+            <label class="chk" style="margin-left:auto"><input type="checkbox" id="pLock" checked> 锁比例</label>
+          </div>
+          <div class="row" style="margin-top:7px">
+            <label class="chk"><input type="checkbox" id="pCrop" checked> 裁剪居中</label>
+            <label class="chk"><input type="checkbox" id="pRemoveBg"> 去背景</label>
+          </div>
+        </div>
+
+        <div style="height:1px;background:var(--line);margin:9px 0"></div>
+        <div class="switchRow only-scan">
+          <span>显示网格</span><label class="switch"><input type="checkbox" id="showGrid" checked><i></i></label>
+        </div>
+        <div class="switchRow">
+          <span>显示边框</span><label class="switch"><input type="checkbox" id="showBorder" checked><i></i></label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="resetGrid" class="mini">移除网格</button>
+        </div>
       </section>
 
-      <section>
-        <h3>图片转像素画</h3>
-        <div class="row">
-          <span class="tiny muted">目标</span>
-          <input type="number" id="pgw" value="50" min="4" max="200" style="width:60px">
-          <span class="muted">×</span>
-          <input type="number" id="pgh" value="50" min="4" max="200" style="width:60px">
-          <button class="tiny" data-preset="50">50</button>
-          <button class="tiny" data-preset="100">100</button>
-          <label class="chk tiny"><input type="checkbox" id="pLock" checked> 锁比例</label>
+      <!-- 4 颜色与映射 -->
+      <section class="card">
+        <div class="cardHead">
+          <span class="num">4</span>
+          <div><h2>颜色与拼豆映射</h2><p>色数与色号映射</p></div>
+          <div class="tail"><button id="legendOpen" class="linkBtn">图例对账</button></div>
+        </div>
+        <div class="only-photo">
+          <div class="field">
+            <span class="lb">色数上限</span>
+            <div class="stepper">
+              <button data-step-in="pColors" data-dir="-1">−</button>
+              <input type="number" id="pColors" min="2" max="221" value="24">
+              <button data-step-in="pColors" data-dir="1">+</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="lb">抖动</span>
+            <select id="pDither">
+              <option value="none">无</option>
+              <option value="ordered">有序</option>
+              <option value="fs">误差扩散</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <button id="autoColor" class="btnPrimary" style="flex:1">自动配色</button>
+          <button id="recolorBtn" class="btnGhost">替换颜色</button>
         </div>
         <div class="row">
-          <span class="tiny muted">色数上限</span>
-          <input type="number" id="pColors" value="24" min="2" max="221" style="width:60px">
-          <span class="tiny muted">抖动</span>
-          <select id="pDither">
-            <option value="none">无</option>
-            <option value="ordered">有序</option>
-            <option value="fs">误差扩散</option>
-          </select>
+          <button id="cleanNoise" class="btnGhost" style="flex:1" title="把只有几颗的零碎色块当杂色清掉">清理杂色</button>
+          <button id="makePattern" class="btnGhost only-photo" style="flex:1">生成像素画</button>
         </div>
-        <div class="row">
-          <span class="tiny muted" style="width:28px">亮度</span>
-          <input type="range" id="pBright" min="-50" max="50" value="0" style="flex:1">
-        </div>
-        <div class="row">
-          <span class="tiny muted" style="width:28px">对比</span>
-          <input type="range" id="pContrast" min="-50" max="50" value="0" style="flex:1">
-        </div>
-        <div class="row">
-          <span class="tiny muted" style="width:28px">饱和</span>
-          <input type="range" id="pSat" min="-50" max="50" value="0" style="flex:1">
-        </div>
-        <div class="row">
-          <label class="chk tiny"><input type="checkbox" id="pRemoveBg"> 去背景</label>
-          <label class="chk tiny"><input type="checkbox" id="pCrop" checked> 裁剪居中</label>
-          <label class="chk tiny"><input type="checkbox" id="pShowImg" checked> 显示原图</label>
-        </div>
-        <div class="row">
-          <button id="makePattern" class="primary">生成像素画</button>
-          <span id="patternInfo" class="muted tiny"></span>
-        </div>
+        <p class="hintLine" id="patternInfo"></p>
       </section>
 
-      <section>
-        <h3>图例对账</h3>
-        <textarea id="legendIn" class="legendBox" placeholder="把图里的图例粘进来，例如：&#10;A20 109&#10;A13 77&#10;（一行也行：A20 109 A13 77 ...）"></textarea>
-        <div class="row">
-          <button id="applyLegend" class="primary">套用图例</button>
-          <span id="legendInfo" class="muted tiny"></span>
+      <!-- 5 编辑工具 -->
+      <section class="card">
+        <div class="cardHead">
+          <span class="num">5</span>
+          <div><h2>编辑工具</h2><p>手动编辑图纸细节</p></div>
         </div>
-        <div id="legendDiff" class="list" style="max-height:150px"></div>
-      </section>
-
-      <section>
-        <h3>编辑 <span id="selInfo" class="muted tiny"></span></h3>
+        <div class="toolGrid">
+          <button id="toolSel" class="tool on">选择</button>
+          <button id="toolErase" class="tool">擦除</button>
+          <button id="toolBox" class="tool">框选网格</button>
+          <button id="toolPan" class="tool">移动</button>
+        </div>
         <div class="row">
           <label class="chk"><input type="radio" name="selmode" value="blob" checked> 连通块</label>
           <label class="chk"><input type="radio" name="selmode" value="color"> 同色全选</label>
-          <label class="chk tiny"><input type="checkbox" id="conn8"> 8连通</label>
+          <label class="chk"><input type="checkbox" id="conn8"> 8连通</label>
         </div>
         <div class="row">
-          <button id="delBtn" class="danger">删除(置空)</button>
-          <button id="recolorBtn">改色</button>
-          <button id="undoBtn">撤销</button>
-          <button id="redoBtn">重做</button>
-          <button id="clearSel" class="tiny">清空选择</button>
+          <button id="delBtn" class="btnGhost" style="flex:1">删除(置空)</button>
+          <button id="clearSel" class="btnGhost">清空选择</button>
         </div>
-        <div class="tiny muted" style="line-height:1.7">
-          图上<b>连续点击</b>可多选（再点一次取消该块），点空白处清空；Shift+点击强制加选。<br>
-          选好后点「删除」或「改色」一次处理全部选中格。
+        <p class="hintLine"><b id="selInfo"></b> 图上连续点击可多选；Shift+点击强制加选。</p>
+      </section>
+
+      <!-- 6 导出 -->
+      <section class="card">
+        <div class="cardHead">
+          <span class="num">6</span>
+          <div><h2>导出与生成</h2><p>生成图纸或导出清单</p></div>
+        </div>
+        <div class="stack">
+          <button id="exportPng" class="btnPrimary big">
+            <span class="only-scan">导出图纸 PNG</span><span class="only-photo">生成图纸</span>
+          </button>
+          <button id="exportCsv" class="btnGhost big">导出用量清单 CSV</button>
         </div>
       </section>
 
-      <section>
-        <h3>统计 <span id="statInfo" class="muted tiny"></span></h3>
-        <div id="stats" class="list"></div>
-      </section>
     </aside>
 
-    <div id="stage">
-      <canvas id="cv"></canvas>
-      <div id="hint">拖入图片，或按 Ctrl+V 粘贴截图</div>
-      <div id="status">等待载入图片</div>
-      <div id="zoomBox">
-        <button id="zoomOut">−</button>
-        <button id="zoomReset">100%</button>
-        <button id="zoomIn">+</button>
+    <!-- ============ 中栏：画布 ============ -->
+    <section class="workspace">
+      <div class="wstools">
+        <button id="undoBtn" class="tb" title="撤销 Ctrl+Z">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 8h6.4a3.1 3.1 0 0 1 0 6.2H6" stroke-linecap="round"/>
+            <path d="M5.6 4.6L2.6 7.8l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button id="redoBtn" class="tb" title="重做 Ctrl+Shift+Z">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M13 8H6.6a3.1 3.1 0 0 0 0 6.2H10" stroke-linecap="round"/>
+            <path d="M10.4 4.6l3 3.2-3 3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <span class="vsep"></span>
+        <button id="tbSelect" class="tb on" title="选择工具">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 2.6l9 4.2-3.7 1.1-1.2 3.6L3 2.6Z" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <span class="vsep"></span>
+        <div class="zoomBox">
+          <button id="zoomOut" title="缩小">−</button>
+          <button id="zoomReset" title="回到 100%">100%</button>
+          <button id="zoomIn" title="放大">+</button>
+        </div>
+        <button id="fitBtn" class="tb" title="适配窗口">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2.5 6V3.5a1 1 0 0 1 1-1H6M10 2.5h2.5a1 1 0 0 1 1 1V6M13.5 10v2.5a1 1 0 0 1-1 1H10M6 13.5H3.5a1 1 0 0 1-1-1V10" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <span class="grow"></span>
+        <label class="pill on only-scan" title="显示 / 隐藏网格线">
+          <input type="checkbox" id="pillGrid" checked>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+            <path d="M1.6 8s2.4-4.2 6.4-4.2S14.4 8 14.4 8 12 12.2 8 12.2 1.6 8 1.6 8Z"/>
+            <circle cx="8" cy="8" r="1.7"/>
+          </svg>
+          显示网格
+        </label>
+        <label class="pill on" title="叠加原图对比">
+          <input type="checkbox" id="pShowImg" checked>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+            <rect x="1.8" y="2.4" width="12.4" height="11.2" rx="1.5"/>
+            <path d="M1.8 10.6l3.2-3 2.6 2.4 2-1.8 3.8 3.4"/>
+          </svg>
+          对比原图
+        </label>
+        <button id="fullBtn" class="tb" title="全屏">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M6 2.5H3.5a1 1 0 0 0-1 1V6M10 2.5h2.5a1 1 0 0 1 1 1V6M13.5 10v2.5a1 1 0 0 1-1 1H10M6 13.5H3.5a1 1 0 0 1-1-1V10" stroke-linecap="round"/>
+            <path d="M2.6 2.6l4 4M13.4 2.6l-4 4M2.6 13.4l4-4M13.4 13.4l-4-4" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
-    </div>
+
+      <div class="wschips">
+        <span class="chip2" id="chipSize">未载入图片</span>
+        <span class="chip2" id="chipGrid">网格 —</span>
+        <span class="chip2" id="chipStep">步长 —</span>
+        <span class="chip2" id="chipColors">颜色 —</span>
+      </div>
+
+      <div id="stage">
+        <canvas id="cv"></canvas>
+        <div id="hint" style="display:none"></div>
+        <div id="status">等待载入图片：拖入文件，或按 Ctrl+V 粘贴截图</div>
+        <div id="thumbCard">
+          <canvas id="thumb2" width="88" height="88" style="width:44px;height:44px;border-radius:6px;background:#F7F8FA;border:1px solid var(--line)"></canvas>
+          <label class="addBtn" for="file" title="打开另一张图片" style="display:grid;place-items:center">+</label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 右栏：检查器 ============ -->
+    <aside class="rail rail-right">
+
+      <section class="card">
+        <div class="cardHead"><div><h2>图纸预览</h2></div></div>
+        <div class="segTabs" style="margin-bottom:8px">
+          <button id="pvTabPattern" class="on">拼豆图纸</button>
+          <button id="pvTabImage">原始图片</button>
+        </div>
+        <canvas id="pv" width="560" height="300"></canvas>
+        <p class="pvMeta" id="pvMeta">网格尺寸 —</p>
+      </section>
+
+      <section class="card">
+        <div class="cardHead"><div><h2>图像信息</h2></div></div>
+        <dl class="kv">
+          <div><dt>原始尺寸</dt><dd id="infoSize">—</dd></div>
+          <div><dt>目标网格</dt><dd id="infoGrid">—</dd></div>
+          <div><dt>网格步长</dt><dd id="infoStep">—</dd></div>
+          <div><dt>颜色数量</dt><dd id="infoColors">—</dd></div>
+          <div><dt>预计拼豆数</dt><dd id="infoBeads">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="cardHead">
+          <div><h2>颜色面板 <span id="clusterInfo" class="muted tiny"></span></h2></div>
+          <div class="tail"><button id="recolorBtn2" class="linkBtn">替换颜色</button></div>
+        </div>
+        <div id="clusterList" class="swatchGrid"><div class="emptyLine">载入图片后显示</div></div>
+        <div id="colorDetail" class="colorDetail">
+          <div class="bigSw" id="cdSw"></div>
+          <div class="cdInfo">
+            <div><span>色号</span><span id="cdCode">—</span></div>
+            <div><span>HEX</span><span id="cdHex">—</span></div>
+            <div><span>数量</span><span id="cdCount">—</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="cardHead">
+          <div><h2>拼豆统计 <span id="statInfo" class="muted tiny"></span></h2></div>
+          <div class="tail"><button id="exportCsvLink" class="linkBtn">导出清单</button></div>
+        </div>
+        <div id="stats" class="statList"><div class="emptyLine">暂无</div></div>
+      </section>
+
+    </aside>
   </main>
 </div>
 
+<!-- 图例对账 -->
+<div id="legendModal" class="modal hidden">
+  <div class="modalBox" style="width:min(620px,94vw)">
+    <div class="modalHead">
+      <strong>图例对账</strong>
+      <button id="legendClose" class="mini" style="margin-left:auto">关闭</button>
+    </div>
+    <div class="modalBody">
+      <p class="tiny muted">把图里的图例粘进来（<code>A20 109</code> 这种，一行一个或全挤一行都行）。套用后会按颗数把每格分配到位，数量与图例完全一致。</p>
+      <textarea id="legendIn" class="legendBox" placeholder="A20 109&#10;A13 77&#10;A01 42"></textarea>
+      <div class="row">
+        <button id="applyLegend" class="btnPrimary">套用图例</button>
+        <span id="legendInfo" class="tiny muted"></span>
+      </div>
+      <div id="legendDiff" class="list legendList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 色号选择 -->
 <div id="modal" class="modal hidden">
   <div class="modalBox">
     <div class="modalHead">
       <strong>选择色号</strong>
       <input type="text" id="palSearch" placeholder="搜索：R11 / 珠光 / A20">
-      <button id="palClose">关闭</button>
+      <button id="palClose" class="mini">关闭</button>
     </div>
     <div class="chips" id="palChips"></div>
     <div class="palGrid" id="palGrid"></div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
 
 <script src="mard-palette.js"></script>

@@ -26,7 +26,7 @@
     img: null, iw: 0, ih: 0, data: null,
     gw: 50, gh: 50,
     gx: 0, gy: 0, cw: 10, ch: 10,
-    inkThr: 22, thick: 10, showGrid: true, showImage: true,
+    inkThr: 22, thick: 10, showGrid: true, showImage: true, showBorder: true,
     samples: null, bg: [255, 255, 255],
     clusters: [], cells: null, clusOf: null,
     legend: null, legendTotal: 0,
@@ -51,6 +51,8 @@
       S.img = img;
       S.iw = c.width; S.ih = c.height;
       S.data = cx.getImageData(0, 0, c.width, c.height).data;
+      if ($('fileName')) $('fileName').textContent = name || '图片';
+      if ($('fileSize')) $('fileSize').textContent = S.iw + ' × ' + S.ih;
       S.gx = S.iw * 0.10; S.gy = S.ih * 0.10;
       S.cw = (S.iw * 0.80) / S.gw; S.ch = (S.ih * 0.80) / S.gh;
       S.samples = null; S.clusters = []; S.cells = null; S.clusOf = null;
@@ -123,10 +125,85 @@
     }
   }
   function updateAll() {
-    renderClusters(); renderStats(); renderLegendDiff(); render();
+    renderClusters(); renderStats(); renderLegendDiff(); renderInspector(); render();
     $('selInfo').textContent = S.sel.size ? '已选 ' + S.sel.size + ' 格' : '';
     $('geoInfo').textContent = S.data ? ('格 ' + S.cw.toFixed(2) + '×' + S.ch.toFixed(2) +
       ' · 起点 ' + S.gx.toFixed(1) + ',' + S.gy.toFixed(1)) : '';
+  }
+
+  // ---------- 右栏检查器 ----------
+  var pvMode = 'pattern';
+  function drawThumbs() {
+    ['thumb', 'thumb2'].forEach(function (id) {
+      var cv = $(id); if (!cv) return;
+      var ctx = cv.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      if (!S.img) return;
+      var s = Math.min(cv.width / S.iw, cv.height / S.ih);
+      var w = S.iw * s, h = S.ih * s;
+      ctx.drawImage(S.img, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+    });
+  }
+  function renderPreview() {
+    var cv = $('pv'); if (!cv) return;
+    var w = cv.width, h = cv.height;
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!S.img) {
+      ctx.fillStyle = '#B4B9C2';
+      ctx.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('未载入图片', w / 2, h / 2);
+      return;
+    }
+    if (pvMode === 'image' || !S.cells) {
+      var si = Math.min((w - 24) / S.iw, (h - 24) / S.ih);
+      ctx.drawImage(S.img, (w - S.iw * si) / 2, (h - S.ih * si) / 2, S.iw * si, S.ih * si);
+      return;
+    }
+    var gwPx = S.gw * S.cw, ghPx = S.gh * S.ch;
+    var s2 = Math.min((w - 28) / gwPx, (h - 28) / ghPx);
+    drawProject(ctx, { sx: s2, sy: s2, tx: (w - gwPx * s2) / 2 - S.gx * s2, ty: (h - ghPx * s2) / 2 - S.gy * s2 },
+      { codes: false, ruler: false, noImage: true, clean: true, fillBg: true });
+  }
+  function renderColorDetail() {
+    var code = null, cl = null;
+    if (S.hlCode) code = S.hlCode;
+    else if (S.hlCluster >= 0) {
+      cl = S.clusters.filter(function (c) { return c.id === S.hlCluster; })[0];
+      if (cl) code = cl.code;
+    } else if (S.clusters.length) {
+      // 没有主动选中时，回落到色板里的第一个色号，右栏不至于全空
+      var first = S.clusters.filter(function (c) { return !!c.code; })[0] || S.clusters[0];
+      if (first) { cl = first; code = first.code; }
+    }
+    var n = 0;
+    if (code && S.cells) {
+      for (var i = 0; i < S.cells.length; i++) if (S.cells[i] === code) n++;
+    }
+    var sw = $('cdSw'); if (!sw) return;
+    if (code) { sw.style.background = hexOf(code); }
+    else if (cl) { sw.style.background = 'rgb(' + cl.rgb.join(',') + ')'; }
+    else { sw.style.background = '#fff'; }
+    $('cdCode').textContent = code || (cl ? '未指定' : '—');
+    $('cdHex').textContent = code ? hexOf(code).toUpperCase() : '—';
+    $('cdCount').textContent = code ? (n + ' 颗') : '—';
+  }
+  function renderInspector() {
+    var set = function (id, v) { var el = $(id); if (el) el.textContent = v; };
+    set('chipSize', S.iw ? (S.iw + ' × ' + S.ih) : '未载入图片');
+    set('chipGrid', S.data ? ('网格 ' + S.gw + ' × ' + S.gh) : '网格 —');
+    set('chipStep', S.data ? ('步长 ' + S.cw.toFixed(1) + 'px') : '步长 —');
+    set('chipColors', S.clusters.length ? ('颜色 ' + S.clusters.length) : '颜色 —');
+    set('infoSize', S.iw ? (S.iw + ' × ' + S.ih) : '—');
+    set('infoGrid', S.data ? (S.gw + ' × ' + S.gh) : '—');
+    set('infoStep', S.data ? (S.cw.toFixed(2) + ' px') : '—');
+    set('infoColors', S.clusters.length ? (S.clusters.length + ' 色') : '—');
+    set('infoBeads', S.cells ? (PC.countCodes(S.cells).total.toLocaleString() + ' 颗') : '—');
+    set('pvMeta', S.data ? ('网格尺寸 ' + S.gw + ' × ' + S.gh + ' · 步长 ' + S.cw.toFixed(1) + 'px') : '网格尺寸 —');
+    drawThumbs(); renderPreview(); renderColorDetail();
   }
 
   // 移除网格：清掉识别结果，只留原图，方便重新对齐
@@ -173,6 +250,7 @@
     }
     S.gx = geo.gx; S.gy = geo.gy; S.cw = geo.cw; S.ch = geo.ch;
     resample(true);
+    setTool('select');
     fitView();
     if (!silent) toast('自动对齐完成（' + Math.round(performance.now() - t0) + 'ms），不准就微调或框选');
   }
@@ -206,8 +284,13 @@
     }
     var ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#0c0d10';
+    ctx.fillStyle = '#EDEFF2';
     ctx.fillRect(0, 0, w, h);
+    var zl = $('zoomReset');
+    if (zl) {
+      var zt = Math.round(S.view.s * 100) + '%';
+      if (zl.textContent !== zt) zl.textContent = zt;
+    }
     if (!S.data) return;
     if (!S.gridActive) {
       // 只画原图（不叠网格），方便用户看清楚再去框选
@@ -218,8 +301,8 @@
       if (S.boxDrag) {
         var bd = S.boxDrag;
         ctx.save();
-        ctx.strokeStyle = '#49c1ff';
-        ctx.fillStyle = 'rgba(73,193,255,.12)';
+        ctx.strokeStyle = '#2E7CF6';
+        ctx.fillStyle = 'rgba(46,124,246,.12)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 4]);
         ctx.fillRect(Math.min(bd.x0, bd.x1), Math.min(bd.y0, bd.y1),
@@ -231,26 +314,26 @@
       return;
     }
     drawProject(ctx, { sx: S.view.s, sy: S.view.s, tx: S.view.tx, ty: S.view.ty },
-      { imageAlpha: S.showImage ? 0.32 : 0 });
+      { imageAlpha: S.showImage ? 0.32 : 0, fillBg: true });
     if (S.boxFirst && S.mouse) {
       var ax = S.boxFirst.x, ay = S.boxFirst.y, bx = S.mouse.x, by = S.mouse.y;
       ctx.save();
-      ctx.strokeStyle = 'rgba(73,193,255,.9)';
-      ctx.fillStyle = 'rgba(73,193,255,.08)';
+      ctx.strokeStyle = 'rgba(46,124,246,.9)';
+      ctx.fillStyle = 'rgba(46,124,246,.08)';
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       ctx.fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
       ctx.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
       ctx.setLineDash([]);
-      ctx.fillStyle = '#49c1ff';
+      ctx.fillStyle = '#2E7CF6';
       ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
     if (S.boxDrag) {
       var d = S.boxDrag;
       ctx.save();
-      ctx.strokeStyle = '#49c1ff';
-      ctx.fillStyle = 'rgba(73,193,255,.12)';
+      ctx.strokeStyle = '#2E7CF6';
+      ctx.fillStyle = 'rgba(46,124,246,.12)';
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       var x0 = Math.min(d.x0, d.x1), y0 = Math.min(d.y0, d.y1);
@@ -262,17 +345,17 @@
   function drawProject(ctx, view, opt) {
     opt = opt || {};
     var sx = view.sx, sy = view.sy;
+    var gw = S.gw, gh = S.gh, cw = S.cw, ch = S.ch, gx = S.gx, gy = S.gy;
     ctx.save();
     ctx.transform(sx, 0, 0, sy, view.tx, view.ty);
+    if (opt.fillBg) { ctx.fillStyle = '#fff'; ctx.fillRect(gx, gy, gw * cw, gh * ch); }
     if (S.img && !opt.noImage) {
       ctx.globalAlpha = opt.imageAlpha != null ? opt.imageAlpha : 0.32;
       ctx.drawImage(S.img, 0, 0);
       ctx.globalAlpha = 1;
     }
-    var gw = S.gw, gh = S.gh, cw = S.cw, ch = S.ch, gx = S.gx, gy = S.gy;
     var cellPx = cw * sx;
     var i, r, c, x, y, code, hex, pal, alpha, hit;
-    if (opt.fillBg) { ctx.fillStyle = '#fff'; ctx.fillRect(gx, gy, gw * cw, gh * ch); }
     if (S.cells) {
       var hlOn = !opt.clean && (S.hlCode || S.hlCluster >= 0);
       for (r = 0; r < gh; r++) {
@@ -315,8 +398,8 @@
       for (c = 0; c <= gw; c += tk) { x = gx + c * cw; ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, gy + gh * ch); ctx.stroke(); }
       for (r = 0; r <= gh; r += tk) { y = gy + r * ch; ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx + gw * cw, y); ctx.stroke(); }
     }
-    if (opt.codes !== false && cellPx >= 16 && S.cells) {
-      var fs = cw * 0.46;
+    if (opt.codes !== false && cellPx >= 34 && S.cells) {
+      var fs = cw * 0.44;
       ctx.font = '600 ' + fs.toFixed(2) + 'px ui-monospace,Consolas,monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       for (r = 0; r < gh; r++) {
@@ -340,8 +423,8 @@
     }
     if (!opt.clean && S.sel.size) {
       ctx.save();
-      ctx.fillStyle = 'rgba(255,209,102,.38)';
-      ctx.strokeStyle = '#ffd166';
+      ctx.fillStyle = 'rgba(242,160,61,.38)';
+      ctx.strokeStyle = '#F2A03D';
       ctx.lineWidth = Math.max(1, 2 / Math.max(sx, 1e-4));
       S.sel.forEach(function (idx) {
         var rr = (idx / gw) | 0, cc = idx % gw;
@@ -351,9 +434,11 @@
       });
       ctx.restore();
     }
-    ctx.strokeStyle = 'rgba(73,193,255,.85)';
-    ctx.lineWidth = Math.max(1.2, 2 / Math.max(sx, 1e-4));
-    ctx.strokeRect(gx, gy, gw * cw, gh * ch);
+    if (S.showBorder !== false || opt.clean) {
+      ctx.strokeStyle = 'rgba(46,124,246,.85)';
+      ctx.lineWidth = Math.max(1.2, 2 / Math.max(sx, 1e-4));
+      ctx.strokeRect(gx, gy, gw * cw, gh * ch);
+    }
     ctx.restore();
   }
 
@@ -369,41 +454,30 @@
         counts.set(cl, (counts.get(cl) || 0) + 1);
       }
     }
-    $('clusterInfo').textContent = S.clusters.length ? '(' + S.clusters.length + ' 色)' : '';
-    if (!S.clusters.length) { box.innerHTML = '<div class="muted tiny">载入图片后显示</div>'; return; }
+    $('clusterInfo').textContent = S.clusters.length ? '(' + S.clusters.length + ')' : '';
+    if (!S.clusters.length) { box.innerHTML = '<div class="emptyLine">载入图片后显示</div>'; return; }
     var list = S.clusters.slice().sort(function (a, b) { return (counts.get(b.id) || 0) - (counts.get(a.id) || 0); });
     box.innerHTML = '';
     var frag = document.createDocumentFragment();
     list.forEach(function (cl) {
       var n = counts.get(cl.id) || 0;
-      var row = document.createElement('div');
-      row.className = 'rowItem' + (S.hlCluster === cl.id ? ' hl' : '');
       var mat = cl.code ? matOf(cl.code) : '';
-      var tagCls = 'tag' + (!cl.code ? ' bad' : (mat === '实色' ? '' : ' warn'));
-      var altHtml = (cl.altSpecial && cl.altSpecial.code !== cl.code)
-        ? '<span class="tag warn" data-act="alt" title="颜色几乎一样，可能是特殊材质">≈' + cl.altSpecial.code + '</span>' : '';
-      row.innerHTML =
-        '<span class="sw" style="background:' + (cl.code ? hexOf(cl.code) : 'rgb(' + cl.rgb.join(',') + ')') + '"></span>' +
-        '<span class="code">' + (cl.code || '?') + '</span>' +
-        '<span class="' + tagCls + '">' + (cl.code ? mat : '未指定') + '</span>' + altHtml +
-        '<span class="grow"></span><span class="tiny muted">' + n + '</span>' +
-        '<button class="tiny" data-act="pick">改</button>';
-      row.title = 'ΔE ' + (cl.de === 999 ? '-' : cl.de.toFixed(1)) + ' / rgb(' + cl.rgb.join(',') + ')' +
-        (cl.altSpecial ? ' / 特殊材质候选 ' + cl.altSpecial.code : '');
-      row.addEventListener('click', function (e) {
-        var act = e.target.getAttribute && e.target.getAttribute('data-act');
-        if (act) return;
+      var b = document.createElement('button');
+      b.className = 'swatch' + (S.hlCluster === cl.id ? ' on' : '') + (cl.code ? '' : ' unspec');
+      if (cl.code) b.style.background = hexOf(cl.code);
+      b.title = (cl.code || '未指定') + (cl.code ? ' · ' + mat : '') + ' · ' + n + ' 颗' +
+        (cl.altSpecial && cl.altSpecial.code !== cl.code ? '（≈' + cl.altSpecial.code + '）' : '') +
+        ' · 双击改色';
+      b.addEventListener('click', function () {
         S.hlCluster = (S.hlCluster === cl.id ? -1 : cl.id);
         S.hlCode = null;
         updateAll();
       });
-      var altEl = row.querySelector('[data-act=alt]');
-      if (altEl) altEl.addEventListener('click', function (e) { e.stopPropagation(); assignCluster(cl, cl.altSpecial.code); });
-      row.querySelector('[data-act=pick]').addEventListener('click', function (e) {
-        e.stopPropagation();
+      b.addEventListener('dblclick', function (e) {
+        e.preventDefault();
         openPalette(function (code) { assignCluster(cl, code); });
       });
-      frag.appendChild(row);
+      frag.appendChild(b);
     });
     box.appendChild(frag);
   }
@@ -415,19 +489,22 @@
   }
   function renderStats() {
     var st = PC.countCodes(S.cells || []);
-    $('statInfo').textContent = st.total ? (st.total + ' 颗 / ' + st.rows.length + ' 色') : '';
+    $('statInfo').textContent = st.total ? (st.total + ' 颗 · ' + st.rows.length + ' 色') : '';
     var box = $('stats');
-    if (!st.total) { box.innerHTML = '<div class="muted tiny">暂无</div>'; return; }
+    if (!st.total) { box.innerHTML = '<div class="emptyLine">暂无</div>'; return; }
     box.innerHTML = '';
     var frag = document.createDocumentFragment();
-    st.rows.forEach(function (row) {
+    st.rows.forEach(function (row, i) {
+      var pct = row.n / st.total * 100;
       var el = document.createElement('div');
-      el.className = 'rowItem' + (S.hlCode === row.code ? ' hl' : '');
-      el.innerHTML = '<span class="sw" style="background:' + hexOf(row.code) + '"></span>' +
-        '<span class="code">' + row.code + '</span>' +
-        '<span class="tag' + (matOf(row.code) === '实色' ? '' : ' warn') + '">' + matOf(row.code) + '</span>' +
-        '<span class="grow"></span><span class="tiny">' + row.n + '</span>' +
-        '<span class="tiny muted">' + (row.n / st.total * 100).toFixed(1) + '%</span>';
+      el.className = 'statRow' + (S.hlCode === row.code ? ' on' : '');
+      el.innerHTML = '<span class="idx">' + (i + 1) + '</span>' +
+        '<span class="sw" style="background:' + hexOf(row.code) + '"></span>' +
+        '<span class="nm">' + row.code + '</span>' +
+        '<span class="n">' + row.n + '</span>' +
+        '<span class="pct">' + pct.toFixed(1) + '%</span>' +
+        '<i class="bar" style="width:' + Math.max(2, Math.round(pct)) + '%"></i>';
+      el.title = row.code + ' · ' + matOf(row.code) + ' · ' + row.n + ' 颗 · ' + pct.toFixed(1) + '%';
       el.addEventListener('click', function () {
         S.hlCode = (S.hlCode === row.code ? null : row.code);
         S.hlCluster = -1; updateAll();
@@ -610,6 +687,17 @@
     S.undo.push(S.cells.slice()); S.cells = S.redo.pop(); S.sel.clear(); updateAll();
   }
 
+  // 擦除：单击即置空，按住可连续擦；一次笔画只压一条 undo
+  var eraseDirty = false;
+  function eraseAt(idx) {
+    if (!S.cells || idx < 0 || idx >= S.cells.length) return;
+    if (!S.cells[idx]) return;
+    S.cells[idx] = null;
+    if (S.sel.has(idx)) S.sel.delete(idx);
+    eraseDirty = true;
+    render();
+  }
+
   // ---------- 色号弹窗 ----------
   var palCb = null, palSeries = 'all';
   var CHIPS = [['all', '全部'], ['std', '标准221'], ['P', '珠光'], ['R', '半透明'], ['T', '全透明'],
@@ -679,12 +767,26 @@
       render();
       return;
     }
+    if (S.tool === 'erase') {
+      var ce = hitCell(p.x, p.y);
+      if (ce >= 0) {
+        if (S.cells && S.cells[ce]) pushUndo();
+        eraseAt(ce);
+        S.dragging = { type: 'erase' };
+      }
+      e.preventDefault();
+      return;
+    }
     var cell = hitCell(p.x, p.y);
     if (cell >= 0) selectCell(cell, e.shiftKey);
   });
   window.addEventListener('mousemove', function (e) {
     var p = canvasPos(e);
     S.mouse = p;
+    if (S.dragging && S.dragging.type === 'erase') {
+      eraseAt(hitCell(p.x, p.y));
+      return;
+    }
     if (S.dragging && S.dragging.type === 'pan') {
       S.view.tx += p.x - S.dragging.px; S.view.ty += p.y - S.dragging.py;
       S.dragging.px = p.x; S.dragging.py = p.y;
@@ -702,6 +804,12 @@
     }
   });
   window.addEventListener('mouseup', function () {
+    if (S.dragging && S.dragging.type === 'erase') {
+      S.dragging = null;
+      if (eraseDirty) { eraseDirty = false; updateAll(); }
+      updateCursor();
+      return;
+    }
     updateCursor();
     S.dragging = null;
     if (S.boxAnchor) {
@@ -759,7 +867,9 @@
   // ---------- 控件 ----------
   function updateCursor() {
     if (!S.data) return;
-    var cur = S.spaceDown ? 'grab' : (S.tool === 'box' ? 'crosshair' : 'default');
+    var cur = S.spaceDown ? 'grab'
+      : (S.tool === 'box' || S.tool === 'erase') ? 'crosshair'
+      : (S.tool === 'pan' ? 'grab' : 'default');
     $('cv').style.cursor = cur;
   }
   function showBoxHint(on) {
@@ -773,6 +883,11 @@
     if (t !== 'box') { S.boxFirst = null; S.boxAnchor = null; S.boxDrag = null; }
     S.tool = t;
     $('boxTool').classList.toggle('active', t === 'box');
+    var map = { select: 'toolSel', erase: 'toolErase', box: 'toolBox', pan: 'toolPan' };
+    Object.keys(map).forEach(function (k) {
+      var el = $(map[k]); if (el) el.classList.toggle('on', k === t);
+    });
+    var tbSel = $('tbSelect'); if (tbSel) tbSel.classList.toggle('on', t === 'select');
     showBoxHint(t === 'box');
     updateCursor();
   }
@@ -805,7 +920,11 @@
     resample(true);
   });
   $('makePattern').addEventListener('click', makePattern);
-  $('pShowImg').addEventListener('change', function (e) { S.showImage = e.target.checked; render(); });
+  $('pShowImg').addEventListener('change', function (e) {
+    S.showImage = e.target.checked;
+    if (e.target.parentNode) e.target.parentNode.classList.toggle('on', S.showImage);
+    render();
+  });
   Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
     b.addEventListener('click', function () {
       var n = parseInt(b.getAttribute('data-preset'), 10);
@@ -854,7 +973,11 @@
   $('undoBtn').addEventListener('click', doUndo);
   $('redoBtn').addEventListener('click', doRedo);
   $('clearSel').addEventListener('click', function () { S.sel.clear(); updateAll(); });
-  $('showGrid').addEventListener('change', function (e) { S.showGrid = e.target.checked; render(); });
+  $('showGrid').addEventListener('change', function (e) {
+    S.showGrid = e.target.checked;
+    var pg = $('pillGrid'); if (pg) { pg.checked = S.showGrid; if (pg.parentNode) pg.parentNode.classList.toggle('on', S.showGrid); }
+    render();
+  });
   $('thick').addEventListener('change', function (e) { S.thick = clamp(parseInt(e.target.value, 10) || 10, 2, 30); render(); });
   $('inkThr').addEventListener('input', function (e) {
     S.inkThr = parseInt(e.target.value, 10) || 22;
@@ -1001,6 +1124,163 @@
     lines.push(['合计', '', '', st.total, '100'].join(','));
     download(new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), '拼豆用量清单.csv');
   }
+
+  // ---------- v0.3 新界面：模式 / 工具 / 检查器 ----------
+  var MODE = 'scan';
+  function setMode(m) {
+    MODE = m;
+    document.body.setAttribute('data-mode', m);
+    $('modeScan').classList.toggle('on', m === 'scan');
+    $('modePhoto').classList.toggle('on', m === 'photo');
+    renderInspector();
+  }
+  $('modeScan').addEventListener('click', function () { setMode('scan'); });
+  $('modePhoto').addEventListener('click', function () { setMode('photo'); });
+
+  $('fileClear').addEventListener('click', function () {
+    S.img = null; S.data = null; S.iw = 0; S.ih = 0;
+    S.samples = null; S.clusters = []; S.cells = null; S.clusOf = null;
+    S.sel.clear(); S.undo = []; S.redo = [];
+    S.gridActive = false; S.legend = null; S.legendTotal = 0;
+    S.hlCode = null; S.hlCluster = -1;
+    $('fileName').textContent = '未选择图片';
+    $('fileSize').textContent = '拖入图片或 Ctrl+V';
+    $('file').value = '';
+    updateAll();
+    setStatus('等待载入图片：拖入文件，或按 Ctrl+V 粘贴截图');
+    toast('已移除图片');
+  });
+
+  function setGeoPane(which) {
+    var auto = which === 'auto';
+    $('tabAuto').classList.toggle('on', auto);
+    $('tabManual').classList.toggle('on', !auto);
+    $('paneAuto').style.display = auto ? '' : 'none';
+    $('paneManual').style.display = auto ? 'none' : '';
+  }
+  $('tabAuto').addEventListener('click', function () { setGeoPane('auto'); });
+  $('tabManual').addEventListener('click', function () { setGeoPane('manual'); });
+
+  $('toolSel').addEventListener('click', function () { setTool('select'); });
+  $('toolErase').addEventListener('click', function () { setTool('erase'); });
+  $('toolBox').addEventListener('click', function () { $('boxTool').click(); });
+  $('toolPan').addEventListener('click', function () { setTool('pan'); });
+  $('tbSelect').addEventListener('click', function () { setTool('select'); });
+
+  $('autoAlignIn').addEventListener('click', function () { $('autoAlign').click(); });
+  $('exportPngTop').addEventListener('click', function () { $('exportPng').click(); });
+  $('exportCsvTop').addEventListener('click', function () { $('exportCsv').click(); });
+  $('exportCsvLink').addEventListener('click', function () { $('exportCsv').click(); });
+
+  $('autoColor').addEventListener('click', function () {
+    if (MODE === 'photo') { makePattern(); return; }
+    if (!S.data) return toast('先载入图片');
+    if (S.gridActive) { resample(true); toast('已按当前网格重新配色'); }
+    else { autoAlign(false); }
+  });
+
+  $('recolorBtn2').addEventListener('click', function () {
+    var cl = S.clusters.filter(function (c) { return c.id === S.hlCluster; })[0];
+    if (cl) { openPalette(function (code) { assignCluster(cl, code); }); return; }
+    if (S.hlCode) {
+      var old = S.hlCode;
+      openPalette(function (code) {
+        if (!S.cells) return;
+        pushUndo();
+        for (var i = 0; i < S.cells.length; i++) if (S.cells[i] === old) S.cells[i] = code;
+        S.hlCode = code; updateAll(); toast('已替换为 ' + code);
+      });
+      return;
+    }
+    doRecolor();
+  });
+
+  $('showBorder').addEventListener('change', function (e) { S.showBorder = e.target.checked; render(); });
+
+  $('fullBtn').addEventListener('click', function () {
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    var st = $('stage');
+    if (st.requestFullscreen) st.requestFullscreen();
+  });
+  document.addEventListener('fullscreenchange', function () {
+    setTimeout(function () { fitView(); render(); }, 60);
+  });
+
+  $('pillGrid').addEventListener('change', function (e) {
+    S.showGrid = e.target.checked;
+    $('showGrid').checked = S.showGrid;
+    if (e.target.parentNode) e.target.parentNode.classList.toggle('on', S.showGrid);
+    render();
+  });
+
+  function syncPvTabs() {
+    $('pvTabPattern').classList.toggle('on', pvMode === 'pattern');
+    $('pvTabImage').classList.toggle('on', pvMode === 'image');
+  }
+  $('pvTabPattern').addEventListener('click', function () { pvMode = 'pattern'; syncPvTabs(); renderPreview(); });
+  $('pvTabImage').addEventListener('click', function () { pvMode = 'image'; syncPvTabs(); renderPreview(); });
+
+  $('legendOpen').addEventListener('click', function () {
+    $('legendModal').classList.remove('hidden');
+    $('legendIn').focus();
+  });
+  $('legendClose').addEventListener('click', function () { $('legendModal').classList.add('hidden'); });
+  $('legendModal').addEventListener('click', function (e) {
+    if (e.target === $('legendModal')) $('legendModal').classList.add('hidden');
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-step-in]'), function (b) {
+    b.addEventListener('click', function () {
+      var el = $(b.getAttribute('data-step-in'));
+      if (!el) return;
+      var dir = parseInt(b.getAttribute('data-dir'), 10) || 1;
+      var v = (parseInt(el.value, 10) || 0) + dir;
+      var min = parseInt(el.getAttribute('min'), 10), max = parseInt(el.getAttribute('max'), 10);
+      if (!isNaN(min)) v = Math.max(min, v);
+      if (!isNaN(max)) v = Math.min(max, v);
+      el.value = v;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('input[type=range][data-out]'), function (r) {
+    var out = document.querySelector('[data-for=' + r.id + ']');
+    if (!out) return;
+    r.addEventListener('input', function () { out.textContent = r.value; });
+  });
+
+  $('resetTune').addEventListener('click', function () {
+    ['pBright', 'pContrast', 'pSat'].forEach(function (id) {
+      var el = $(id); if (!el) return;
+      el.value = 0;
+      var out = document.querySelector('[data-for=' + id + ']');
+      if (out) out.textContent = '0';
+    });
+    S.inkThr = 22; $('inkThr').value = 22; $('inkThrVal').textContent = '22';
+    if (S.samples) { rebuildClusters(); updateAll(); }
+    toast('已重置预处理参数');
+  });
+
+  function swapWH(vertical) {
+    if (!S.data) return toast('先载入图片');
+    var need = vertical ? (S.gw >= S.gh) : (S.gh > S.gw);
+    if (need) {
+      var t = S.gw; S.gw = S.gh; S.gh = t;
+      $('gw').value = S.gw; $('gh').value = S.gh;
+      S.gx = 0; S.gy = 0;
+      S.cw = S.iw / S.gw; S.ch = S.ih / S.gh;
+      resample(true); fitView();
+      toast('已按' + (vertical ? '竖版' : '横版') + '交换宽高：' + S.gw + ' × ' + S.gh);
+    }
+    $('dirH').classList.toggle('on', !vertical);
+    $('dirV').classList.toggle('on', vertical);
+  }
+  $('dirH').addEventListener('click', function () { swapWH(false); });
+  $('dirV').addEventListener('click', function () { swapWH(true); });
+
+  syncPvTabs();
+  setGeoPane('auto');
+  setMode('scan');
 
   setStatus('等待载入图片：拖入文件，或按 Ctrl+V 粘贴截图');
   render();
