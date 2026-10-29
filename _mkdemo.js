@@ -98,6 +98,19 @@ const png = Buffer.concat([
   chunk('IEND', Buffer.alloc(0))
 ]);
 
+module.exports = {
+  build: function () {
+    var d = new Uint8ClampedArray(W * H * 4), q = 0, x, y, c;
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
+      c = px(x, y);
+      d[q++] = c[0]; d[q++] = c[1]; d[q++] = c[2]; d[q++] = 255;
+    }
+    return { data: d, w: W, h: H, n: N, cell: CELL, pad: PAD, map: MAP, colors: COLORS };
+  }
+};
+
+if (require.main !== module) return;
+
 const outDir = path.join(__dirname, 'testdata');
 fs.mkdirSync(outDir, { recursive: true });
 const out = path.join(outDir, 'demo.png');

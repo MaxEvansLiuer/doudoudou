@@ -326,7 +326,9 @@
       c2.id = idx;
       c2.rgb = medianColor(c2.cells, samples);
       var lab = rgb2lab(c2.rgb), cand = [];
-      for (j = 0; j < PAL.length; j++) cand.push({ code: PAL[j].code, de: ciede2000(lab, rgb2lab(PAL[j].rgb)), special: !!PAL[j].special });
+      for (j = 0; j < PAL.length; j++) {
+        cand.push({ code: PAL[j].code, de: ciede2000(lab, rgb2lab(PAL[j].rgb)), special: !!PAL[j].special });
+      }
       cand.sort(function (x, y) { return x.de - y.de; });
       c2.candidates = cand.slice(0, 8);
       c2.de = cand[0].de;
@@ -553,6 +555,33 @@
     15, 7, 13, 5
   ];
 
+  // 3×3 众数滤波：邻居里 ≥5/9 是同一个色号才改，避免把胡须这类细线抹掉
+  function smoothCells(cells, gw, gh, pass) {
+    var cur = cells.slice(), p, r, c, dy, dx, rr, cc, code, votes, best, bestN;
+    for (p = 0; p < (pass || 1); p++) {
+      var next = cur.slice();
+      for (r = 0; r < gh; r++) {
+        for (c = 0; c < gw; c++) {
+          votes = new Map();
+          for (dy = -1; dy <= 1; dy++) {
+            for (dx = -1; dx <= 1; dx++) {
+              rr = r + dy; cc = c + dx;
+              if (rr < 0 || cc < 0 || rr >= gh || cc >= gw) continue;
+              code = cur[rr * gw + cc];
+              if (!code) continue;
+              votes.set(code, (votes.get(code) || 0) + 1);
+            }
+          }
+          best = cur[r * gw + c]; bestN = 0;
+          votes.forEach(function (n, cd) { if (n > bestN) { bestN = n; best = cd; } });
+          if (bestN >= 5) next[r * gw + c] = best;
+        }
+      }
+      cur = next;
+    }
+    return cur;
+  }
+
   function buildPatternFromImage(data, iw, ih, opts) {
     opts = opts || {};
     var gw = Math.round(opts.gw || 50), gh = Math.round(opts.gh || 50);
@@ -673,28 +702,35 @@
       }
     }
 
-    // 5) 限制色数：把最少的颜色并到最接近的已有颜色上
+    // 5) 平滑：3×3 众数滤波，去掉格子级的椒盐噪点（源图糊 / JPEG 压缩时特别明显）
+    if (opts.smooth !== false) codes = smoothCells(codes, gw, gh, opts.smoothPass || 1);
+
+    // 6) 限制色数：合并"最接近的一对"，而不是删用得最少的
+    //    —— 按用量删会把面积小但颜色独特的部分（眼睛、耳朵内）优先干掉，
+    //       留下十几种几乎一样的背景蓝。合并最近对则先并近似色，独特色能留住。
     var maxColors = opts.maxColors || 0;
     if (maxColors > 0) {
       var counts = new Map();
       for (i = 0; i < codes.length; i++) if (codes[i]) counts.set(codes[i], (counts.get(codes[i]) || 0) + 1);
       while (counts.size > maxColors) {
-        var list = Array.from(counts.entries()).sort(function (a, b) { return a[1] - b[1]; });
-        var victim = list[0][0];
-        var vLab = rgb2lab(byCode(victim).rgb), bd2 = 1e9, keeper = null;
-        counts.forEach(function (v, code) {
-          if (code === victim) return;
-          var d = ciede2000(vLab, rgb2lab(byCode(code).rgb));
-          if (d < bd2) { bd2 = d; keeper = code; }
-        });
-        if (!keeper) break;
-        for (i = 0; i < codes.length; i++) if (codes[i] === victim) codes[i] = keeper;
-        counts.set(keeper, counts.get(keeper) + counts.get(victim));
-        counts.delete(victim);
+        var keys = Array.from(counts.keys()), bestA = null, bestB = null, bestD = 1e9;
+        for (var q1 = 0; q1 < keys.length; q1++) {
+          for (var q2 = q1 + 1; q2 < keys.length; q2++) {
+            var dd = ciede2000(rgb2lab(byCode(keys[q1]).rgb), rgb2lab(byCode(keys[q2]).rgb));
+            if (dd < bestD) { bestD = dd; bestA = keys[q1]; bestB = keys[q2]; }
+          }
+        }
+        if (!bestA) break;
+        // 保留用得多的那个，把另一个并过去
+        var keep = (counts.get(bestA) || 0) >= (counts.get(bestB) || 0) ? bestA : bestB;
+        var drop = keep === bestA ? bestB : bestA;
+        for (i = 0; i < codes.length; i++) if (codes[i] === drop) codes[i] = keep;
+        counts.set(keep, counts.get(keep) + counts.get(drop));
+        counts.delete(drop);
       }
     }
 
-    // 6) 汇总
+    // 7) 汇总
     var used = new Map();
     for (i = 0; i < codes.length; i++) {
       var cd = codes[i];

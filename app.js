@@ -158,6 +158,7 @@
   }
   function updateAll() {
     renderClusters(); renderStats(); renderLegendDiff(); renderInspector(); render();
+    syncPresetActive();
     $('selInfo').textContent = S.sel.size ? '已选 ' + S.sel.size + ' 格' : '';
     $('geoInfo').textContent = S.data ? ('格 ' + S.cw.toFixed(2) + '×' + S.ch.toFixed(2) +
       ' · 起点 ' + S.gx.toFixed(1) + ',' + S.gy.toFixed(1)) : '';
@@ -589,7 +590,8 @@
       contrast: parseInt($('pContrast').value, 10) || 0,
       saturation: parseInt($('pSat').value, 10) || 0,
       removeBg: $('pRemoveBg').checked,
-      bgTol: 12
+      bgTol: 12,
+      smooth: $('pSmooth') ? $('pSmooth').checked : true
     };
     var t0 = performance.now();
     var res = PC.buildPatternFromImage(S.data, S.iw, S.ih, opts);
@@ -626,7 +628,11 @@
     S.sel.clear(); S.undo = []; S.redo = [];
     S.gridActive = true;
     $('gw').value = S.gw; $('gh').value = S.gh;
-    $('patternInfo').textContent = res.paletteUsed.length + ' 色 / ' + res.total + ' 颗';
+    var maxRec = Math.floor(Math.min(S.iw, S.ih) / 2);
+    $('patternInfo').textContent = res.paletteUsed.length + ' 色 / ' + res.total + ' 颗' +
+      ((S.gw > maxRec || S.gh > maxRec)
+        ? ' · 源图 ' + S.iw + '×' + S.ih + '，格数超过一半容易糊，建议 ≤ ' + maxRec
+        : '');
     updateAll();
     S.fitLock = true;
     fitView();
@@ -961,17 +967,49 @@
     if (e.target.parentNode) e.target.parentNode.classList.toggle('on', S.showImage);
     render();
   });
-  Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
-    b.addEventListener('click', function () {
-      var n = parseInt(b.getAttribute('data-preset'), 10);
-      $('pgw').value = n; $('pgh').value = n;
-    });
-  });
   $('pgw').addEventListener('change', function (e) {
     var v = clamp(parseInt(e.target.value, 10) || 50, 4, 200);
     e.target.value = v;
     if ($('pLock').checked && S.iw) $('pgh').value = clamp(Math.round(v * S.ih / S.iw), 4, 200);
   });
+
+  // 常用拼豆板规格：10/20/26/52/78/104
+  function syncPresetActive() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-grid-preset]'), function (b) {
+      var n = parseInt(b.getAttribute('data-grid-preset'), 10);
+      b.classList.toggle('on', S.gw === n && S.gh === n);
+    });
+    var pw = parseInt(($('pgw') || {}).value, 10), ph = parseInt(($('pgh') || {}).value, 10);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-photo-preset]'), function (b) {
+      var n = parseInt(b.getAttribute('data-photo-preset'), 10);
+      b.classList.toggle('on', pw === n && ph === n);
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-grid-preset]'), function (b) {
+    b.addEventListener('click', function () {
+      var n = parseInt(b.getAttribute('data-grid-preset'), 10);
+      if (S.gw === n && S.gh === n && S.gridActive) {
+        syncPresetActive();
+        toast('网格已经是 ' + n + ' × ' + n);
+        return;
+      }
+      $('gw').value = n;
+      $('gh').value = n;
+      $('gw').dispatchEvent(new Event('change', { bubbles: true }));
+      $('gh').dispatchEvent(new Event('change', { bubbles: true }));
+      syncPresetActive();
+      toast('网格设为 ' + n + ' × ' + n + '，接着点「自动识别」或框选对齐');
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-photo-preset]'), function (b) {
+    b.addEventListener('click', function () {
+      var n = parseInt(b.getAttribute('data-photo-preset'), 10);
+      $('pgw').value = n; $('pgh').value = n;
+      syncPresetActive();
+    });
+  });
+  $('pgw').addEventListener('change', syncPresetActive);
+  $('pgh').addEventListener('change', syncPresetActive);
 
   $('applyLegend').addEventListener('click', applyLegend);
   // 清理杂色：把小到不合理的零碎色块整块置空（水印/花边/压缩噪点），并把这些色从色簇列表里移除

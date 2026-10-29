@@ -161,6 +161,26 @@ function ok(name, cond, extra) {
   click($('#themeBtn'));
   ok('再点按钮可收起菜单', $('#themeMenu').classList.contains('hidden'));
 
+  // 常用规格
+  ok('网格侧 6 个常用规格', d.querySelectorAll('[data-grid-preset]').length === 6,
+    '实际 ' + d.querySelectorAll('[data-grid-preset]').length);
+  click($('[data-grid-preset="26"]'));
+  ok('点 26×26 → 宽高都变 26', $('#gw').value === '26' && $('#gh').value === '26',
+    $('#gw').value + '×' + $('#gh').value);
+  ok('26×26 按钮高亮', $('[data-grid-preset="26"]').classList.contains('on'));
+  click($('[data-grid-preset="104"]'));
+  ok('点 104×104 → 宽高都变 104', $('#gw').value === '104' && $('#gh').value === '104',
+    $('#gw').value + '×' + $('#gh').value);
+  ok('高亮跟着换到 104', $('[data-grid-preset="104"]').classList.contains('on') &&
+    !$('[data-grid-preset="26"]').classList.contains('on'));
+  click($('#modePhoto'));
+  ok('照片侧也是 6 个常用规格', d.querySelectorAll('[data-photo-preset]').length === 6,
+    '实际 ' + d.querySelectorAll('[data-photo-preset]').length);
+  click($('[data-photo-preset="52"]'));
+  ok('照片模式点 52×52 → 目标宽高都变 52', $('#pgw').value === '52' && $('#pgh').value === '52',
+    $('#pgw').value + '×' + $('#pgh').value);
+  click($('#modeScan'));
+
   // 横向溢出
   await wait(100);
   const noOverflow = d.documentElement.scrollWidth <= d.documentElement.clientWidth + 1;

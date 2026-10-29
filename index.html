@@ -169,6 +169,7 @@
   .switchRow{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px;color:var(--fg2)}
   .switchRow:last-child{margin-bottom:0}
   .chk{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--fg2);cursor:pointer}
+  .row>.chk+.chk{margin-left:6px}
   .chk input{accent-color:var(--accent);margin:0}
   .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .row+.row{margin-top:7px}
@@ -210,6 +211,10 @@
   .nudge button:hover{border-color:var(--accentLine);color:var(--accent);background:var(--accentSoft)}
   .trimRow{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;flex:1}
   .trimRow .mini{padding:0}
+  .presetBlock{margin-bottom:9px}
+  .presetLabel{display:block;font-size:11px;color:var(--fg3);margin-bottom:5px}
+  .presetGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+  .presetGrid .mini{padding:0;height:26px;font-size:11px;font-variant-numeric:tabular-nums}
 
   /* ---------- 画布区 ---------- */
   .workspace{display:flex;flex-direction:column;min-width:0;background:var(--surface)}
@@ -543,6 +548,17 @@
                 <button data-step-in="gh" data-dir="1">+</button>
               </div>
             </div>
+            <div class="presetBlock">
+              <span class="presetLabel">常用规格</span>
+              <div class="presetGrid">
+                <button class="mini" data-grid-preset="10">10×10</button>
+                <button class="mini" data-grid-preset="20">20×20</button>
+                <button class="mini" data-grid-preset="26">26×26</button>
+                <button class="mini" data-grid-preset="52">52×52</button>
+                <button class="mini" data-grid-preset="78">78×78</button>
+                <button class="mini" data-grid-preset="104">104×104</button>
+              </div>
+            </div>
             <div class="field">
               <span class="lb">线宽</span>
               <div class="stepper">
@@ -609,12 +625,19 @@
               <button data-step-in="pgh" data-dir="1">+</button>
             </div>
           </div>
-          <div class="row" style="margin-top:8px">
-            <button class="mini" data-preset="50">50×50</button>
-            <button class="mini" data-preset="100">100×100</button>
-            <label class="chk" style="margin-left:auto"><input type="checkbox" id="pLock" checked> 锁比例</label>
+          <div class="presetBlock" style="margin-top:9px">
+            <span class="presetLabel">常用规格</span>
+            <div class="presetGrid">
+              <button class="mini" data-photo-preset="10">10×10</button>
+              <button class="mini" data-photo-preset="20">20×20</button>
+              <button class="mini" data-photo-preset="26">26×26</button>
+              <button class="mini" data-photo-preset="52">52×52</button>
+              <button class="mini" data-photo-preset="78">78×78</button>
+              <button class="mini" data-photo-preset="104">104×104</button>
+            </div>
           </div>
-          <div class="row" style="margin-top:7px">
+          <div class="row" style="margin-top:8px">
+            <label class="chk"><input type="checkbox" id="pLock" checked> 锁比例</label>
             <label class="chk"><input type="checkbox" id="pCrop" checked> 裁剪居中</label>
             <label class="chk"><input type="checkbox" id="pRemoveBg"> 去背景</label>
           </div>
@@ -655,6 +678,10 @@
               <option value="ordered">有序</option>
               <option value="fs">误差扩散</option>
             </select>
+          </div>
+          <div class="field">
+            <span class="lb">平滑去噪</span>
+            <label class="switch" style="margin-left:auto"><input type="checkbox" id="pSmooth" checked><i></i></label>
           </div>
         </div>
         <div class="row" style="margin-top:9px">
