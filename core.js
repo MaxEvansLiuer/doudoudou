@@ -322,11 +322,36 @@
     }
     // 4) 用中位数当最终渲染色，剔除空簇
     clusters = clusters.filter(function (c2) { return c2.cells.length > 0; });
+
+    // 4b) 限制色数：反复合并"最接近的一对"（保留颗数多的那个）
+    //     识别模式以前不设上限，普通照片会冒出几十种颜色 + 满屏碎簇
+    var cap = opts.maxColors || 0;
+    while (cap > 0 && clusters.length > cap) {
+      var mi = -1, mj = -1, md = 1e9;
+      for (i = 0; i < clusters.length; i++) {
+        for (j = i + 1; j < clusters.length; j++) {
+          var dcap = deRgb(clusters[i].rgb, clusters[j].rgb);
+          if (dcap < md) { md = dcap; mi = i; mj = j; }
+        }
+      }
+      if (mi < 0) break;
+      var ki = clusters[mi].cells.length >= clusters[mj].cells.length ? mi : mj;
+      var di = ki === mi ? mj : mi;
+      var KC = clusters[ki], DC = clusters[di];
+      KC.cells = KC.cells.concat(DC.cells);   // 两个簇的格子天然不重叠，不用去重
+      KC.rgb = medianColor(KC.cells, samples);
+      clusters.splice(di, 1);
+      clusters.forEach(function (c3, idx3) { c3.id = idx3; });
+    }
+
     clusters.forEach(function (c2, idx) {
       c2.id = idx;
       c2.rgb = medianColor(c2.cells, samples);
       var lab = rgb2lab(c2.rgb), cand = [];
       for (j = 0; j < PAL.length; j++) {
+        // 特殊材质（珠光/半透明/夜光/光变/温变）颜色上和标准色几乎一样，
+        // 自动配色不选它们，否则整张图会冒出带斜线的"半透明"格子
+        if (PAL[j].special && !opts.allowSpecial) continue;
         cand.push({ code: PAL[j].code, de: ciede2000(lab, rgb2lab(PAL[j].rgb)), special: !!PAL[j].special });
       }
       cand.sort(function (x, y) { return x.de - y.de; });
@@ -591,25 +616,37 @@
     if (!pal.length) return null;
     var palLab = pal.map(function (c) { return { c: c, lab: rgb2lab(c.rgb) }; });
 
-    // 1) 取源区域（裁剪居中 or 拉伸）
+    // 1) 取源区域
+    //    crop    裁剪居中：保持比例，裁掉超出部分
+    //    contain 完整补边：保持比例，整张照片都保留，多出来的地方留空格（推荐"整张照片"用这个）
+    //    stretch 拉伸铺满：全图都用到，但会变形
     var srcW = iw, srcH = ih, sx0 = 0, sy0 = 0;
+    var targetRatio = gw / gh, srcRatio = iw / ih;
     if (fit === 'crop') {
-      var targetRatio = gw / gh, srcRatio = iw / ih;
       if (srcRatio > targetRatio) { srcW = Math.round(ih * targetRatio); sx0 = Math.round((iw - srcW) / 2); }
       else { srcH = Math.round(iw / targetRatio); sy0 = Math.round((ih - srcH) / 2); }
+    } else if (fit === 'contain') {
+      if (srcRatio > targetRatio) { srcW = iw; srcH = iw / targetRatio; sy0 = (ih - srcH) / 2; }
+      else { srcH = ih; srcW = ih * targetRatio; sx0 = (iw - srcW) / 2; }
     }
 
     var bright = (opts.brightness || 0) / 100;
     var contrast = (opts.contrast || 0) / 100;
     var satK = (opts.saturation || 0) / 100;
 
-    // 2) 每格区域均值
+    // 2) 每格区域均值（补边模式下，落在照片外的格子直接标成空格）
     var cellRgb = new Array(gw * gh);
+    var empty = new Array(gw * gh).fill(false);
     var x, y, r, c, o, xa, xb, ya, yb, sr, sg, sb, n;
     for (r = 0; r < gh; r++) {
       for (c = 0; c < gw; c++) {
         xa = Math.floor(sx0 + c * srcW / gw); xb = Math.ceil(sx0 + (c + 1) * srcW / gw) - 1;
         ya = Math.floor(sy0 + r * srcH / gh); yb = Math.ceil(sy0 + (r + 1) * srcH / gh) - 1;
+        if (xb < 0 || xa > iw - 1 || yb < 0 || ya > ih - 1) {
+          empty[r * gw + c] = true;
+          cellRgb[r * gw + c] = [255, 255, 255];
+          continue;
+        }
         xa = xa < 0 ? 0 : xa; ya = ya < 0 ? 0 : ya;
         xb = xb > iw - 1 ? iw - 1 : xb; yb = yb > ih - 1 ? ih - 1 : yb;
         if (xb < xa) xb = xa;
@@ -640,7 +677,6 @@
     }
 
     // 3) 去背景：用四个角判断底色，接近底色的格子置空
-    var empty = new Array(gw * gh).fill(false);
     if (opts.removeBg) {
       var corners = [cellRgb[0], cellRgb[gw - 1], cellRgb[(gh - 1) * gw], cellRgb[gh * gw - 1]];
       var bg = [0, 0, 0], okAll = true;
@@ -649,7 +685,7 @@
       for (i = 0; i < 4; i++) if (deRgb(corners[i], bg) > 18) okAll = false;
       if (okAll) {
         var tol = opts.bgTol == null ? 12 : opts.bgTol;
-        for (i = 0; i < cellRgb.length; i++) if (deRgb(cellRgb[i], bg) < tol) empty[i] = true;
+        for (i = 0; i < cellRgb.length; i++) if (!empty[i] && deRgb(cellRgb[i], bg) < tol) empty[i] = true;
       }
     }
 

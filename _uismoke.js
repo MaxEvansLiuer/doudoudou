@@ -181,6 +181,13 @@ function ok(name, cond, extra) {
     $('#pgw').value + '×' + $('#pgh').value);
   click($('#modeScan'));
 
+  // 照片适配方式
+  ok('适配方式默认「完整补边」', $('#pFit').value === 'contain', $('#pFit').value);
+  ok('适配方式有三个选项', $('#pFit').options.length === 3, String($('#pFit').options.length));
+  $('#pFit').value = 'crop';
+  ok('可切到裁剪居中', $('#pFit').value === 'crop');
+  $('#pFit').value = 'contain';
+
   // 横向溢出
   await wait(100);
   const noOverflow = d.documentElement.scrollWidth <= d.documentElement.clientWidth + 1;

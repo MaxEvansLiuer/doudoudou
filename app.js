@@ -43,6 +43,11 @@
   var MAT = { P: '珠光', Q: '温变', R: '半透明', T: '全透明', Y: '夜光', ZG: '光变' };
   function hexOf(code) { return BY[code] ? BY[code].hex : '#888888'; }
   function matOf(code) { return PC.materialOf(code); }
+  function colorCap() {
+    var el = $('pColors');
+    var n = el ? parseInt(el.value, 10) : 24;
+    return (n >= 2 && n <= 221) ? n : 24;
+  }
 
   var toastEl = $('toast'), toastTimer = 0;
   function toast(msg) {
@@ -96,6 +101,8 @@
       updateAll();
       S.fitLock = true;
       fitView();
+      // 照片模式下导入即出图，不用再点「生成」
+      if (MODE === 'photo') schedulePattern();
       setStatus('已载入 ' + S.iw + '×' + S.ih +
         '：填好宽高后点「自动对齐」；没把握就点「框选网格」（拖一下，或点两个对角）');
       toast('已载入 ' + (name || '图片'));
@@ -146,7 +153,9 @@
   }
   function rebuildClusters() {
     if (!S.samples) return;
-    var b = PC.buildClusters(S.samples, S.inkThr, S.bg, { maxColors: S.legend ? S.legend.length : 0 });
+    // 有图例时按图例色数（最准）；没有就用「色数上限」，否则普通照片会冒出几十种颜色
+    var cap = S.legend ? S.legend.length : colorCap();
+    var b = PC.buildClusters(S.samples, S.inkThr, S.bg, { maxColors: cap });
     S.clusters = b.clusters;
     S.clusOf = b.clusOf;
     if (S.legend) {
@@ -276,8 +285,9 @@
     if (why) {
       // 不改变当前几何，直接让用户手动选
       removeGrid(true);                     // 没把握就把旧网格也清掉，画布回到干净的原图
-      setStatus('自动对齐没把握（' + why + '）→ 已切到「框选网格」：拖一下，或点两个对角');
-      toast('自动对齐没把握，已切到手动框选');
+      setStatus('自动对齐没把握（' + why + '）→ 已切到「框选网格」：拖一下，或点两个对角。' +
+        '如果这是普通照片而不是图纸截图，切到「普通照片」模式效果更好');
+      toast('没找到规则网格。这是普通照片的话，切「普通照片」模式更合适');
       setTool('box');
       return;
     }
@@ -577,11 +587,19 @@
   }
 
   // ---------- 图片转像素画 ----------
-  function makePattern() {
+  // auto=true 表示"自动重算"（导入 / 调参数时），不弹 toast、不压撤销栈
+  var patternTimer = 0;
+  function schedulePattern() {
+    if (MODE !== 'photo' || !S.data) return;
+    clearTimeout(patternTimer);
+    patternTimer = setTimeout(function () { makePattern(true); }, 200);
+  }
+  function makePattern(auto) {
     if (!S.data) return toast('先载入一张图片/照片');
+    var hadCells = !!S.cells;
     var gw = clamp(parseInt($('pgw').value, 10) || 50, 4, 200);
     var gh = clamp(parseInt($('pgh').value, 10) || 50, 4, 200);
-    var fit = $('pCrop').checked ? 'crop' : 'stretch';
+    var fit = $('pFit').value;
     var opts = {
       gw: gw, gh: gh, fit: fit,
       maxColors: clamp(parseInt($('pColors').value, 10) || 0, 0, 221),
@@ -602,6 +620,11 @@
       var tr = gw / gh, sr = S.iw / S.ih;
       if (sr > tr) { srcW = Math.round(S.ih * tr); sx0 = Math.round((S.iw - srcW) / 2); }
       else { srcH = Math.round(S.iw / tr); sy0 = Math.round((S.ih - srcH) / 2); }
+    } else if (fit === 'contain') {
+      // 整张保留：多出来的方向留空格，网格会超出图片边界
+      var tr3 = gw / gh, sr3 = S.iw / S.ih;
+      if (sr3 > tr3) { srcW = S.iw; srcH = S.iw / tr3; sy0 = (S.ih - srcH) / 2; }
+      else { srcH = S.ih; srcW = S.ih * tr3; sx0 = (S.iw - srcW) / 2; }
     }
     S.gw = gw; S.gh = gh;
     S.gx = sx0; S.gy = sy0;
@@ -634,12 +657,10 @@
         ? ' · 源图 ' + S.iw + '×' + S.ih + '，格数超过一半容易糊，建议 ≤ ' + maxRec
         : '');
     updateAll();
-    S.fitLock = true;
-    fitView();
-    pushUndo();
+    if (!auto || !hadCells) { S.fitLock = true; fitView(); }
+    if (!auto) { pushUndo(); toast('已生成像素画'); }
     setStatus('已生成像素画：' + S.gw + '×' + S.gh + ' · ' + res.paletteUsed.length + ' 色 · ' +
       res.total + ' 颗 · ' + Math.round(performance.now() - t0) + 'ms（可继续用色簇/选区/导出）');
-    toast('已生成像素画');
   }
 
   // ---------- 图例 ----------
@@ -1011,6 +1032,21 @@
   $('pgw').addEventListener('change', syncPresetActive);
   $('pgh').addEventListener('change', syncPresetActive);
 
+  // 色数上限：识别模式下改了要立刻重算色簇（照片模式点生成时才用，S.samples 为 null 不会触发）
+  $('pColors').addEventListener('change', function () {
+    var v = clamp(parseInt(this.value, 10) || 24, 2, 221);
+    this.value = v;
+    if (S.samples) { rebuildClusters(); updateAll(); }
+  });
+
+  // 照片参数一改就自动重算（input + change 都监听，靠 schedulePattern 里的防抖去重）
+  ['pColors', 'pSmooth', 'pDither', 'pBright', 'pContrast', 'pSat', 'pRemoveBg', 'pFit', 'pgw', 'pgh', 'pLock']
+    .forEach(function (id) {
+      var el = $(id); if (!el) return;
+      el.addEventListener('input', schedulePattern);
+      el.addEventListener('change', schedulePattern);
+    });
+
   $('applyLegend').addEventListener('click', applyLegend);
   // 清理杂色：把小到不合理的零碎色块整块置空（水印/花边/压缩噪点），并把这些色从色簇列表里移除
   $('cleanNoise').addEventListener('click', function () {
@@ -1212,6 +1248,8 @@
     $('modeScan').classList.toggle('on', m === 'scan');
     $('modePhoto').classList.toggle('on', m === 'photo');
     renderInspector();
+    // 切到照片模式：已经有图就直接出一版，省掉一次点击
+    if (m === 'photo' && S.data) schedulePattern();
   }
   $('modeScan').addEventListener('click', function () { setMode('scan'); });
   $('modePhoto').addEventListener('click', function () { setMode('photo'); });

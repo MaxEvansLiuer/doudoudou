@@ -636,9 +636,16 @@
               <button class="mini" data-photo-preset="104">104×104</button>
             </div>
           </div>
-          <div class="row" style="margin-top:8px">
+          <div class="field" style="margin-top:9px">
+            <span class="lb">适配</span>
+            <select id="pFit" style="margin-left:auto">
+              <option value="contain" selected>完整补边（整张保留）</option>
+              <option value="crop">裁剪居中（裁掉多余）</option>
+              <option value="stretch">拉伸铺满（会变形）</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:7px">
             <label class="chk"><input type="checkbox" id="pLock" checked> 锁比例</label>
-            <label class="chk"><input type="checkbox" id="pCrop" checked> 裁剪居中</label>
             <label class="chk"><input type="checkbox" id="pRemoveBg"> 去背景</label>
           </div>
         </div>
@@ -662,15 +669,15 @@
           <div><h2>颜色与拼豆映射</h2><p>色数与色号映射</p></div>
           <div class="tail"><button id="legendOpen" class="linkBtn">图例对账</button></div>
         </div>
-        <div class="only-photo">
-          <div class="field">
-            <span class="lb">色数上限</span>
-            <div class="stepper">
-              <button data-step-in="pColors" data-dir="-1">−</button>
-              <input type="number" id="pColors" min="2" max="221" value="24">
-              <button data-step-in="pColors" data-dir="1">+</button>
-            </div>
+        <div class="field">
+          <span class="lb">色数上限</span>
+          <div class="stepper">
+            <button data-step-in="pColors" data-dir="-1">−</button>
+            <input type="number" id="pColors" min="2" max="221" value="24">
+            <button data-step-in="pColors" data-dir="1">+</button>
           </div>
+        </div>
+        <div class="only-photo">
           <div class="field">
             <span class="lb">抖动</span>
             <select id="pDither">
